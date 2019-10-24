@@ -14,7 +14,6 @@ namespace Enc_Service
     public partial class Enc_Service : ServiceBase
     {
         private ManagementEventWatcher mgmtEvtWatcher;
-        public EventLog EventLog;
         private System.Timers.Timer MyTimer;
         public Enclsoure_class Enclosure;
         public Dictionary<string, uint?[]> AllData;
@@ -27,50 +26,34 @@ namespace Enc_Service
         public static bool process_flag = false;
 
         public static string TimeParameter = "30";
-        public static string LogPath = @"C:\ProgramData\Promise\ServiceLog\";
-        public static string LogName = "WMIServiceLog";
-        public static string LogType = ".txt";
-
-        public static int LogId = 0;
-        public static int LogSize = 50 * 1024 * 1024;
-
-        public static string[] LogTime = new string[3];
-        public static string[] LogFile = new string[3];
-        public static string FilePath = LogPath + LogName + LogType;
-        public static string FilePathTime;
 
         public Enc_Service()
         {
-            Program.pro_log.WriteEntry("hello in there");
+            Program.Pro_Event_viewer.WriteEntry("hello in there");
             InitializeComponent();
 
-            this.Enclosure = new Enclsoure_class();
-            EventLog = new EventLog();
-
-            if (!EventLog.SourceExists("Enc_Service"))
+            DirectoryInfo LogExist = new DirectoryInfo(Log_File.LogPath);
+            FileInfo[] FileExist = LogExist.GetFiles(Log_File.LogName + "*");
+            Log_File.LogId = (FileExist.Length - 1);
+            for (int i = 0; i <= Log_File.LogId; i++)
             {
-                EventLog.CreateEventSource("Enc_Service", "Enc_Log");
+                Log_File.LogFile[i] = Convert.ToString(FileExist[i]);
             }
-            EventLog.Source = "Enc_Service";
-            EventLog.Log = "Enc_Log";
+
+            if (!EventLog.SourceExists("Promise"))
+            {
+                EventLog.CreateEventSource("Promise", "Promise_event");
+            }
+            
+            this.Enclosure = new Enclsoure_class();
         }
 
         protected override void OnStart(string[] args)
         {
-            DirectoryInfo LogExist = new DirectoryInfo(LogPath);
-            FileInfo[] FileExist = LogExist.GetFiles(LogName + "*");
 
-            EventLog.WriteEntry("Enc_Service started...");
-            EventLog.WriteEntry("TimeParameter= \"" + TimeParameter + "\"\n");
-            //this.Enclosure = new Enclsoure_class();
-            LogId = (FileExist.Length - 1);
-
-            for (int i = 0; i <= LogId; i++)
-            {
-                LogFile[i] = Convert.ToString(FileExist[i]);
-            }
-
-            FileLog("Service is Start!");
+            Program.Pro_Event_viewer.WriteEntry("Enc_Service started...");
+            Program.Pro_Event_viewer.WriteEntry("TimeParameter= \"" + TimeParameter + "\"\n");
+            Log_File.FileLog("Service is Start!JOEL");
             enc_Service = new Enc_Service();
             try
             {
@@ -87,15 +70,14 @@ namespace Enc_Service
 
         protected override void OnStop()
         {
-            FileLog("Service is Stop!");
+            Log_File.FileLog("Service is Stop!");
             try
             {
-                Program.pro_log.WriteEntry("Enc_Service stopped...");
-                EventLog.WriteEntry("Enc_Service stopped...");
+                Program.Pro_Event_viewer.WriteEntry("Enc_Service stopped...");
             }
             catch (Exception e)
             {
-                EventLog.WriteEntry("Stop Management Event Watcher failed...");
+                Program.Pro_Event_viewer.WriteEntry("Stop Management Event Watcher failed...");
             }
         }
 
@@ -109,66 +91,6 @@ namespace Enc_Service
             {
                 //FileLog("Log Test");
             }
-        }
-
-        static public void FileLog(string LogMessage)
-        {
-            DirectoryInfo LogExist = new DirectoryInfo(LogPath);
-            FileInfo[] FileExist = LogExist.GetFiles(LogName + "*");
-           
-            if (FileExist.Length == 0)
-            {
-                LogId = FileExist.Length;
-                LogTime[LogId] = DateTime.Now.ToString("_yyyyMMdd_hhmmss");
-                LogFile[LogId] = LogName + LogTime[LogId] + LogType;
-                FilePathTime = LogPath + LogFile[LogId];
-                using (FileStream stream = new FileStream(FilePathTime, FileMode.Append))
-                using (StreamWriter writer = new StreamWriter(stream))
-                {
-                    writer.WriteLine($"{DateTime.Now.ToString("yyyyMMdd_hh:mm:ss")}" + ", Log file is create!");
-                }
-            }
-            else
-            {
-                FilePathTime = LogPath + LogFile[LogId];
-                using (FileStream stream = new FileStream(FilePathTime, FileMode.Append))
-                using (StreamWriter writer = new StreamWriter(stream))
-                {
-                    writer.WriteLine($"{DateTime.Now.ToString("yyyyMMdd_hh:mm:ss")}" + " , " + LogMessage);
-                    if (FileExist.Length == 3)
-                    {
-                        DelLogFile();
-                    }
-                    CheckLogSize();
-                    writer.Close();
-                }
-            }
-        }
-
-        static public void CheckLogSize()
-        {
-            FileInfo filesize = new FileInfo(FilePathTime);
-            if (filesize.Length >= LogSize)
-            {
-                LogId += 1;
-                if (LogId == 3)
-                {
-                    LogId = 0;
-                }
-                LogTime[LogId] = DateTime.Now.ToString("_yyyyMMdd_hhmmss");
-                LogFile[LogId] = LogName + LogTime[LogId] + LogType;
-                FilePathTime = LogPath + LogFile[LogId];
-            }
-        }
-
-        static public void DelLogFile()
-        {
-            DirectoryInfo LogExist = new DirectoryInfo(LogPath);
-            FileInfo[] FileExist = LogExist.GetFiles(LogName + "*");
-
-            string DeleteFilePath = LogPath + Convert.ToString(FileExist[0]);
-
-            File.Delete(DeleteFilePath);
         }
 
         public void Dispose()
@@ -330,13 +252,7 @@ namespace Enc_Service
 
             if (GetRegistry("FanConfig"))
             {
-                FileLog("Fan Chang!!!");
-                for (int i = 0; i < GetRegFan.Length; i ++)
-                { 
-                    FileLog(Convert.ToString(GetRegFan[i]));
-                }
                 Enclosure.Enclosure_SET_fan(GetRegFan);
-                FileLog("Fan out!!!");
                 request_flag = true;
             }
             if (GetRegistry("LedConfig"))
@@ -376,11 +292,8 @@ namespace Enc_Service
                                 int FanCount = RegValue[i];
                                 int FanSpeed = (FanLevel << 16) + FanCount;
                                 //Console.WriteLine("FanLevel = {01:x}  FanCount = {1:x} ", FanLevel, FanCount);
-                                FileLog("FanLevel = " + FanLevel);
-                                FileLog("FanCount = " + FanCount);
                                 GetRegFan[i / 4] = Convert.ToUInt32(FanLevel);
                                 //Console.WriteLine("FanLevel[{0}] = {1:x} ", (i / 4), GetRegFan[i / 4]);
-                                FileLog("GetRegFan = " + GetRegFan[i / 4]);
                             }
                         }
                     }
