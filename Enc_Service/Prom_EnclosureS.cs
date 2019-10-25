@@ -13,7 +13,7 @@ namespace Prom_Enclosure_Serives
 {
     public partial class Prom_EnclosureS : ServiceBase
     {
-        private System.Timers.Timer MyTimer;
+        private System.Timers.Timer Enclosure_update_timer;
         public Enclsoure_class Enclosure;
         public Dictionary<string, uint?[]> AllData;
         public uint?[] GetRegFan;// GetRegFan.Length = 4 * Fan.Length
@@ -64,10 +64,10 @@ namespace Prom_Enclosure_Serives
             try
             {
                 Registry_Watcher.Start();
-                MyTimer = new System.Timers.Timer();
-                MyTimer.Interval = Convert.ToInt32(TimeParameter) * 1000;
-                MyTimer.Elapsed += new ElapsedEventHandler(MyTimer_Elapsed);
-                MyTimer.Start();
+                Enclosure_update_timer = new System.Timers.Timer();
+                Enclosure_update_timer.Interval = Convert.ToInt32(TimeParameter) * 1000;
+                Enclosure_update_timer.Elapsed += new ElapsedEventHandler(Enclosure_update);
+                Enclosure_update_timer.Start();
             }
             catch (Exception e)
             {
@@ -89,16 +89,12 @@ namespace Prom_Enclosure_Serives
             }
         }
 
-        private void MyTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private void Enclosure_update(object sender, ElapsedEventArgs e)
         {
             //enc_Service = new Enc_Service();
             Enc_Main();
 
-            //Log Test Code
-            for (int i = 0; i < 50; i++)
-            {
-                //FileLog("Log Test");
-            }
+           
         }
 
         public void Close()

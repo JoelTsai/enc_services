@@ -38,7 +38,7 @@ namespace Chip.Contrl
                     HDD_TEMP[i] = 0;
                 }
                try
-                 {
+                {
                   for (int i = 0; i < HDDinfo.Length; i++)
                    {
                     int slotid = Convert.ToInt32(HDDinfo[i].PDId);
@@ -54,11 +54,12 @@ namespace Chip.Contrl
                   //  Console.WriteLine("temperature[{1}]={0}", Convert.ToUInt16(HDDinfo[i].temperature), i);
 
                   }
-            }
-            catch(Exception ex)
-            {
-                Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
-            }
+                }
+                catch(Exception ex)
+                {
+
+                   // Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
+                }
         }
 
     }
