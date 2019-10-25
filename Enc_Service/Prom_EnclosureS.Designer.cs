@@ -1,6 +1,6 @@
-﻿namespace Enc_Service
+﻿namespace Prom_Enclosure_Serives
 {
-    partial class Enc_Service
+    partial class Prom_EnclosureS
     {
         /// <summary> 
         /// 設計工具所需的變數。

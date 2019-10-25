@@ -1,15 +1,9 @@
 ﻿using System;
 using System.ServiceProcess;
 using System.IO;
-using System.Management;
 using System.Diagnostics;
-using Enclsoure;
-using Microsoft.Win32;
-using System.Collections.Generic;
-using System.Timers;
-using System.Threading;
 
-namespace Enc_Service
+namespace Prom_Enclosure_Serives
 {
     static public class Program
     {
@@ -19,10 +13,10 @@ namespace Enc_Service
         {
             if (args.Length != 0)
             {
-                Enc_Service.TimeParameter = System.Text.RegularExpressions.Regex.Replace(args[0], "[^0-9]", "");
+                Prom_EnclosureS.TimeParameter = System.Text.RegularExpressions.Regex.Replace(args[0], "[^0-9]", "");
             }
             Pro_Event_viewer.Source = "Promise";
-            Pro_Event_viewer.Log = "Promise_event";
+  //          Pro_Event_viewer.Log = "Promise_event";
             if (!(Directory.Exists(Log_File.LogPath)))
             {
                 Directory.CreateDirectory(Log_File.LogPath);
@@ -31,7 +25,7 @@ namespace Enc_Service
             ServiceBase[] ServicesToRun;
             ServicesToRun = new ServiceBase[]
             {
-                new Enc_Service()
+                new Prom_EnclosureS()
             };
             ServiceBase.Run(ServicesToRun);
         }
@@ -42,18 +36,18 @@ namespace Enc_Service
         /// <summary>
         /// is there necessary???????????????
         /// </summary>
-        public static string LogPath = @"C:\ProgramData\Promise\ServiceLog\";
-        public static string LogName = "WMIServiceLog";
-        public static string LogType = ".txt";
-        public static int LogId = 0;
-        public static string[] LogTime = new string[3];
-        public static string[] LogFile = new string[3];
-        public static string FilePath = LogPath + LogName + LogType;
-        public static string FilePathTime;
-        public static int LogSize = 50 * 1024 * 1024;
+        internal static string LogPath = @"C:\ProgramData\Promise\ServiceLog\";
+        internal static string LogName = "WMIServiceLog";
+        internal static string LogType = ".txt";
+        internal static int LogId = 0;
+        internal static string[] LogTime = new string[3];
+        internal static string[] LogFile = new string[3];
+        internal static string FilePath = LogPath + LogName + LogType;
+        internal static string FilePathTime;
+        internal static int LogSize = 50 * 1024 * 1024;//MB
 
 
-        static public void FileLog(string LogMessage)
+        static internal void FileLog(string LogMessage)
         {
             DirectoryInfo LogExist = new DirectoryInfo(LogPath);
             FileInfo[] FileExist = LogExist.GetFiles(LogName + "*");
@@ -69,6 +63,7 @@ namespace Enc_Service
                 {
                     writer.WriteLine($"{DateTime.Now.ToString("yyyyMMdd_hh:mm:ss")}" + ", Log file is create!");
                     writer.WriteLine($"{DateTime.Now.ToString("yyyyMMdd_hh:mm:ss")}" + " , " + LogMessage);
+                    writer.Close();
                 }
             }
             else

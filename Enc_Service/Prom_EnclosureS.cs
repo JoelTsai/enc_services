@@ -9,11 +9,10 @@ using System.Collections.Generic;
 using System.Timers;
 using System.Threading;
 
-namespace Enc_Service
+namespace Prom_Enclosure_Serives
 {
-    public partial class Enc_Service : ServiceBase
+    public partial class Prom_EnclosureS : ServiceBase
     {
-        private ManagementEventWatcher mgmtEvtWatcher;
         private System.Timers.Timer MyTimer;
         public Enclsoure_class Enclosure;
         public Dictionary<string, uint?[]> AllData;
@@ -27,7 +26,7 @@ namespace Enc_Service
 
         public static string TimeParameter = "30";
 
-        public Enc_Service()
+        public Prom_EnclosureS()
         {
             Program.Pro_Event_viewer.WriteEntry("hello in there");
             InitializeComponent();
@@ -54,9 +53,17 @@ namespace Enc_Service
             Program.Pro_Event_viewer.WriteEntry("Enc_Service started...");
             Program.Pro_Event_viewer.WriteEntry("TimeParameter= \"" + TimeParameter + "\"\n");
             Log_File.FileLog("Service is Start!JOEL");
-            enc_Service = new Enc_Service();
+            Enc_Service = new Prom_EnclosureS();
+
+            WqlEventQuery query = new WqlEventQuery(@"SELECT * FROM RegistryKeyChangeEvent WHERE Hive='HKEY_LOCAL_MACHINE' AND KeyPath='SOFTWARE\\Pro_HWMonitor'");
+            ManagementEventWatcher Registry_Watcher = new ManagementEventWatcher(query);
+            Registry_Watcher.EventArrived += new EventArrivedEventHandler(Enc_Service.ChkReqRoutine);
+
+  
+            
             try
             {
+                Registry_Watcher.Start();
                 MyTimer = new System.Timers.Timer();
                 MyTimer.Interval = Convert.ToInt32(TimeParameter) * 1000;
                 MyTimer.Elapsed += new ElapsedEventHandler(MyTimer_Elapsed);
@@ -64,7 +71,7 @@ namespace Enc_Service
             }
             catch (Exception e)
             {
-                
+                Log_File.FileLog(Convert.ToString(e));
             }
         }
 
@@ -93,62 +100,16 @@ namespace Enc_Service
             }
         }
 
-        public void Dispose()
-        {
-            this.Close();
-        }
-
         public void Close()
         {
             Console.WriteLine("Computer has already been displosed.");
         }
-        public Enc_Service enc_Service;
+
+        public Prom_EnclosureS Enc_Service;
         public  void Enc_Main()
         {
-            bool show_help = false;
             int interval = -1; // This value will not be changed if no "-i" in args.
 
-            /*
-            try
-            {
-                DebugLogger.LoadConfiguration();
-            }
-            catch (Exception ex)
-            {
-                // Fail to check the debug option in registry. Just disable the debug logger.
-                Console.WriteLine(ex.ToString());
-                DebugLogger.Disable();
-            }
-
-            DebugLogger.WriteLine("==== START DebugLogger ====");
-
-            var optionSet = new NDesk.Options.OptionSet() {
-                { "i|interval=",
-                   "the time interval of updating, in seconds.\n" + "No loops if it is not a vaild positive integer",
-                    (int v) => interval = (v<0?0:v) },
-                { "h|help",  "show this message and exit",
-                   v => show_help = v != null },
-
-            };
-            
-            List<string> extra = null;
-            try
-            {
-                extra = optionSet.Parse(args);
-            }
-            catch (NDesk.Options.OptionException e)
-            {
-                Console.WriteLine(e.Message);
-                Console.WriteLine("Try `platformwmi.exe --help' for more information.");
-                return -1;
-            }
-
-            if (show_help)
-            {
-                ShowHelp(optionSet);
-                return 0;
-            }
-            */
             if (interval >= 0)
             {
                 // Exit if this application is already running in another process.
@@ -159,51 +120,14 @@ namespace Enc_Service
                     if (proc.Id != curProcess.Id && proc.ProcessName == curProcess.ProcessName)
                     {
                         Console.WriteLine("This application is already running as process {0}", proc.Id);
+                        OnStop();
                     }
                 }
             }
-
-          //  using (Enc_Service enc_Service = new Enc_Service())/*init the chip.*/
-           // {
-                //watcher.EventArrived += new EventArrivedEventHandler(enc_Service.ChkReqRoutine);
-                //watcher.Start();
-                enc_Service.ChkReqRoutine();
-                /*
-                try
-                {
-
-                    WqlEventQuery query = new WqlEventQuery("SELECT * FROM RegistryKeyChangeEvent WHERE Hive='HKEY_LOCAL_MACHINE' AND KeyPath='SOFTWARE\\Pro_HWMonitor'");
-                    ManagementEventWatcher watcher = new ManagementEventWatcher(query);
-
-                    watcher.EventArrived += new EventArrivedEventHandler(enc_Service.ChkReqRoutine);
-                    // Start listening for events.
-                    FileLog("Start");
-                    watcher.Start();
-                    FileLog("Start End");
-                    System.Threading.Thread.Sleep(100000000);
-
-                    watcher.Stop();
-                }
-                catch (ManagementException WatcherErr)
-                {
-                    FileLog("An error occurred: " + WatcherErr.Message);
-                }
-                */
-                do
-                {
                     Console.WriteLine("----------------------------v0.1");
-
-                    enc_Service.Enclosure.GetEnclosureData(ref enc_Service.AllData);
-                    enc_Service.SetToREG();
-
-
-                    if (interval > 0)
-                        Thread.Sleep(interval * 1000);
-
-                } while (interval >= 0);
-           // }
+                    Enc_Service.Enclosure.GetEnclosureData(ref Enc_Service.AllData);
+                    Enc_Service.SetToREG();
             process_flag = true;
-            //watcher.Stop();
         }
 
 
@@ -246,7 +170,7 @@ namespace Enc_Service
         }
 
         //public void ChkReqRoutine(object sender, EventArrivedEventArgs e)
-        public bool ChkReqRoutine()
+        public void ChkReqRoutine(object sender, EventArrivedEventArgs e)
         {
             bool request_flag = false;
 
@@ -265,7 +189,7 @@ namespace Enc_Service
                 Enclosure.Enclosure_SET_Temp_threshold(Temp_threshold);
                 request_flag = true;
             }
-            return request_flag;
+            //return request_flag;
         }
 
         private bool GetRegistry(string unit)
