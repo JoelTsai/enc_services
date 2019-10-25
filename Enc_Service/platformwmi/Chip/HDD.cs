@@ -57,7 +57,7 @@ namespace Chip.Contrl
             }
             catch(Exception ex)
             {
-               // Console.WriteLine("PDtemp_update_fail={0}", ex);
+                Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
             }
         }
 

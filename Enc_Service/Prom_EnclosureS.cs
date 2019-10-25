@@ -85,6 +85,7 @@ namespace Prom_Enclosure_Serives
             catch (Exception e)
             {
                 Program.Pro_Event_viewer.WriteEntry("Stop Management Event Watcher failed...");
+                Program.Pro_Event_viewer.WriteEntry(Convert.ToString(e));
             }
         }
 
@@ -125,7 +126,7 @@ namespace Prom_Enclosure_Serives
                 }
             }
                     Console.WriteLine("----------------------------v0.1");
-                    Enc_Service.Enclosure.GetEnclosureData(ref Enc_Service.AllData);
+                    Enc_Service.Enclosure.GetEnclosureData(ref AllData);
                     Enc_Service.SetToREG();
             process_flag = true;
         }

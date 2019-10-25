@@ -7,10 +7,7 @@
 **                    All Rights  Reserved.                                  **
 **---------------------------------------------------------------------------*/
 using System;
-using System.Threading;
-using System.Globalization;
-using System.Text;
-using Enc_Service.platformwmi;
+
 
 
 
@@ -28,10 +25,18 @@ namespace Chip.Contrl
 		public const uint TCA6416A_PORT_0 	= 0;
 		public const uint TCA6416A_PORT_1 	= 1;
 
-		public const uint TCA6416A_GPIO_IN 	= 1;
-		public const uint TCA6416A_GPIO_OUT = 0;
+        public const uint TCA6416A_INPUT_PORT_0 = 0x0;
+        public const uint TCA6416A_INPUT_PORT_1 = 0x1;
         public const uint TCA6416A_OUTPUT_PORT_0 =0x2;
         public const uint TCA6416A_OUTPUT_PORT_1 =0x3;
+        public const uint TCA6416A_POLARITY_PORT_0 = 0x4;
+        public const uint TCA6416A_POLARITY_PORT_1 = 0x5;
+        public const uint TCA6416A_CONFIG_PORT_0 = 0x6;
+        public const uint TCA6416A_CONFIG_PORT_1 = 0x7;
+
+        public const uint TCA6416A_GPIO_IN 	= 1;
+		public const uint TCA6416A_GPIO_OUT = 0;
+
 
         public const uint ENC_LED_HDD_0         = 0;
 		public const uint ENC_LED_HDD_1         = 1;
@@ -71,8 +76,28 @@ namespace Chip.Contrl
 		//public PCHSMBUS SMB;
 		public TCA6416()
 		{
-			//this.SMB = new PCHSMBUS();
-		}
+            //this.SMB = new PCHSMBUS();
+            uint data_temp = 0x00;
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_OUTPUT_PORT_0, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_OUTPUT_PORT_1, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_0, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_1, ref data_temp);
+
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_CONFIG_PORT_0, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_CONFIG_PORT_1, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_CONFIG_PORT_0, ref data_temp);
+
+            data_temp = 0x80;
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_CONFIG_PORT_1, ref data_temp);
+
+            data_temp = 0x00;
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_OUTPUT_PORT_0, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_LO, TCA6416_Constants.TCA6416A_OUTPUT_PORT_1, ref data_temp);
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_1, ref data_temp);
+
+            data_temp = 0x44;
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_0, ref data_temp);
+        }
 
 		public int Tca6416a_write_value(uint addr, uint reg, ref uint data)
 		{

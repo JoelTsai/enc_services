@@ -24,7 +24,7 @@ goto QUIT
 :SetEnv
 cd %~d0\%~p0
 call %DEVENV% x64
-MSBuild.exe Prom_EnclosureS.sln /t:Clean,Build /p:Configuration=Release /p:Platform="x64"
+MSBuild.exe Enclosure_Monitor.sln /t:Clean,Build /p:Configuration=Release /p:Platform="x64"
 
 :QUIT
 IF NOT "%1" == "NOPAUSE" (

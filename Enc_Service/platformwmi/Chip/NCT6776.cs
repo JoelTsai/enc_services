@@ -219,7 +219,6 @@ namespace Chip.Contrl
         public void Set_Fan(uint fanNum, uint level)
         {
             uint fanlevel = 0;
-            Prom_Enclosure_Serives.Log_File.FileLog("Set_FanSet_FanSet_FanSet_FanSet_Fan!");
            // Console.WriteLine("fanNum =  0x{0:x}", fanNum);
             switch (fanNum)
             {
