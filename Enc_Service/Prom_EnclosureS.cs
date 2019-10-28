@@ -26,6 +26,8 @@ namespace Prom_Enclosure_Serives
 
         public static string TimeParameter = "30";
 
+      //  public Prom_EnclosureS Enc_Service;
+
         public Prom_EnclosureS()
         {
             Program.Pro_Event_viewer.WriteEntry("hello in there");
@@ -53,11 +55,11 @@ namespace Prom_Enclosure_Serives
             Program.Pro_Event_viewer.WriteEntry("Enc_Service started...");
             Program.Pro_Event_viewer.WriteEntry("TimeParameter= \"" + TimeParameter + "\"\n");
             Log_File.FileLog("Service is Start!JOEL");
-            Enc_Service = new Prom_EnclosureS();
+           // Enc_Service = new Prom_EnclosureS();
 
             WqlEventQuery query = new WqlEventQuery(@"SELECT * FROM RegistryKeyChangeEvent WHERE Hive='HKEY_LOCAL_MACHINE' AND KeyPath='SOFTWARE\\Pro_HWMonitor'");
             ManagementEventWatcher Registry_Watcher = new ManagementEventWatcher(query);
-            Registry_Watcher.EventArrived += new EventArrivedEventHandler(Enc_Service.ChkReqRoutine);
+            Registry_Watcher.EventArrived += new EventArrivedEventHandler(ChkReqRoutine);
 
   
             
@@ -102,7 +104,6 @@ namespace Prom_Enclosure_Serives
             Console.WriteLine("Computer has already been displosed.");
         }
 
-        public Prom_EnclosureS Enc_Service;
         public  void Enc_Main()
         {
             int interval = -1; // This value will not be changed if no "-i" in args.
@@ -122,8 +123,8 @@ namespace Prom_Enclosure_Serives
                 }
             }
                     Console.WriteLine("----------------------------v0.1");
-                    Enc_Service.Enclosure.GetEnclosureData(ref AllData);
-                    Enc_Service.SetToREG();
+                    Enclosure.GetEnclosureData(ref AllData);
+                    SetToREG();
             process_flag = true;
         }
 

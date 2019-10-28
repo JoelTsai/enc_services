@@ -137,8 +137,10 @@ namespace i2api
                 Marshal.FreeHGlobal(HDDinfoIntptr);
 
             }
+            catch(OverflowException)
+            {
 
-
+            }
             catch (Exception ex)
             {
                 Console.WriteLine("GetHardDiskDriveInfo_FAIL{0}", ex);

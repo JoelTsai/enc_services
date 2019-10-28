@@ -63,7 +63,7 @@ namespace Chip.Contrl
                 catch (Exception ex)
                 {
 
-                    Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
+                    Prom_Enclosure_Serives.Log_File.FileLog("PDtemp_update_FAIL"+Convert.ToString(ex));
                 }
            
         }
