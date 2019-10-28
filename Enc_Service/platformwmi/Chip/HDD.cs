@@ -55,11 +55,17 @@ namespace Chip.Contrl
 
                   }
                 }
-                catch(Exception ex)
+
+                catch (IndexOutOfRangeException)
+                {
+                
+                }
+                catch (Exception ex)
                 {
 
-                   // Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
+                    Prom_Enclosure_Serives.Log_File.FileLog(Convert.ToString(ex));
                 }
+           
         }
 
     }

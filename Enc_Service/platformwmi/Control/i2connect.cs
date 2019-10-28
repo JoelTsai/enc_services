@@ -142,6 +142,7 @@ namespace i2api
             catch (Exception ex)
             {
                 Console.WriteLine("GetHardDiskDriveInfo_FAIL{0}", ex);
+                Prom_Enclosure_Serives.Log_File.FileLog("GetHardDiskDriveInfo_FAIL:"+Convert.ToString(ex));
             }
         }
 

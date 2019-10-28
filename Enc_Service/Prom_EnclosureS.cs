@@ -162,7 +162,7 @@ namespace Prom_Enclosure_Serives
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-
+                Log_File.FileLog("SetToREG_FAIL:" + Convert.ToString(ex));
             }
         }
 
