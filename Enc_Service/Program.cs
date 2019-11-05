@@ -21,6 +21,16 @@ namespace Prom_Enclosure_Serives
             {
                 Directory.CreateDirectory(Log_File.LogPath);
             }
+
+            DirectoryInfo LogExist = new DirectoryInfo(Log_File.LogPath);
+            FileInfo[] FileExist = LogExist.GetFiles(Log_File.LogName + "*");
+            Log_File.LogId = (FileExist.Length - 1);
+
+            for (int i = 0; i <= Log_File.LogId; i++)
+            {
+                Log_File.LogFile[i] = Convert.ToString(FileExist[i]);
+            }
+
             Pro_Event_viewer.WriteEntry("project init!");
             ServiceBase[] ServicesToRun;
             ServicesToRun = new ServiceBase[]
