@@ -73,7 +73,12 @@ namespace Prom_Enclosure_Serives
 
         protected override void OnStop()
         {
+            Enclosure_update_timer.Stop();
             Log_File.FileLog("Service is Stop!");
+            
+            Enclosure.GetEnclosureData(ref AllData);
+            SetToREG();//Do Final update;
+
             try
             {
                 Program.Pro_Event_viewer.WriteEntry("Enc_Service stopped...");
