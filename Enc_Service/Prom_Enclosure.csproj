@@ -72,11 +72,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="platformwmi\Chip\LPCIO.cs" />
-    <Compile Include="Prom_EnclosureS.cs">
+    <Compile Include="Prom_Enclosure.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Prom_EnclosureS.Designer.cs">
-      <DependentUpon>Prom_EnclosureS.cs</DependentUpon>
+    <Compile Include="Prom_Enclosure.Designer.cs">
+      <DependentUpon>Prom_Enclosure.cs</DependentUpon>
     </Compile>
     <Compile Include="platformwmi\BigEndianBinaryWriter.cs" />
     <Compile Include="platformwmi\Chip\CPU.cs" />
