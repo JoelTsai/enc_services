@@ -15,49 +15,52 @@ using WingRing;
 namespace Chip.Contrl
 {
 
-    static class NCT6776_Constants
+    static class NCT5567_Constants
     {
 
-        internal const uint NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN = 0;
-        internal const uint NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN = 1;
-        internal const uint NCT6XXX_ENV_CTRL_FAN_SEN_AUXTIN = 2;
-        internal const uint NCT6XXX_ENV_CTRL_FAN_ALL = 0xFF;
+        internal const uint NCT5567_ENV_CTRL_FAN_SEN_CPUTIN = 0;
+        internal const uint NCT5567_ENV_CTRL_FAN_SEN_SYSTIN = 1;
+        internal const uint NCT5567_ENV_CTRL_FAN_SEN_AUXTIN = 2;
+        internal const uint NCT5567_ENV_CTRL_FAN_ALL = 0xFF;
 
-        internal const uint Nct6776_ENV_FAN_CONFIG_SYSFAN_REG = 0x004;
-        internal const uint Nct6776_ENV_FAN_CONFIG_FAN_PWM = 0x000;
-        internal const uint Nct6776_ENV_FAN_MODE_SYSFAN_REG = 0x102;
-        internal const uint Nct6776_ENV_FAN_MODE_CPUFAN_REG = 0x202;
-        internal const uint Nct6776_ENV_FAN_MODE_AUXFAN_REG = 0x302;
-        internal const uint Nct6776_ENV_FAN_MODE_FAN_MANUAL_MODE = 0x000;
-        internal const ushort Nct6776_ENV_FAN_SET_SYSFAN_REG = 0x109;
-        internal const ushort Nct6776_ENV_FAN_SET_CPUFAN_REG = 0x209;
-        internal const ushort Nct6776_ENV_FAN_SET_AUXFAN_REG = 0x309;
-        internal const ushort Nct6776_ENV_FAN_GET_SYSFAN_VAL_H_REG = 0x656;
-        internal const ushort Nct6776_ENV_FAN_GET_SYSFAN_VAL_L_REG = 0x657;
-        internal const ushort Nct6776_ENV_FAN_GET_CPUFAN_VAL_H_REG = 0x658;
-        internal const ushort Nct6776_ENV_FAN_GET_CPUFAN_VAL_L_REG = 0x659;
-        internal const ushort Nct6776_ENV_FAN_GET_AUXFAN_VAL_H_REG = 0x65A;
-        internal const ushort Nct6776_ENV_FAN_GET_AUXFAN_VAL_L_REG = 0x65B;
-        internal const ushort Nct6776_ENV_FAN_GET_SYSFAN_COUNT_H_REG = 0x630;
-        internal const ushort Nct6776_ENV_FAN_GET_SYSFAN_COUNT_L_REG = 0x631;
-        internal const ushort Nct6776_ENV_FAN_GET_CPUFAN_COUNT_H_REG = 0x632;
-        internal const ushort Nct6776_ENV_FAN_GET_CPUFAN_COUNT_L_REG = 0x633;
-        internal const ushort Nct6776_ENV_FAN_GET_AUXFAN_COUNT_H_REG = 0x634;
-        internal const ushort Nct6776_ENV_FAN_GET_AUXFAN_COUNT_L_REG = 0x635;
+        internal const uint NCT5567_ENV_FAN_CONFIG_SYSFAN_REG = 0x004;
+        internal const uint NCT5567_ENV_FAN_CONFIG_FAN_PWM = 0x000;
+        internal const uint NCT5567_ENV_FAN_MODE_SYSFAN_REG = 0x102;
+        internal const uint NCT5567_ENV_FAN_MODE_CPUFAN_REG = 0x202;
+        internal const uint NCT5567_ENV_FAN_MODE_AUXFAN_REG = 0x302;
+        internal const uint NCT5567_ENV_FAN_MODE_FAN_MANUAL_MODE = 0x000;
+        internal const ushort NCT5567_ENV_FAN_SET_SYSFAN_REG = 0x109;
+        internal const ushort NCT5567_ENV_FAN_SET_CPUFAN_REG = 0x209;
+        internal const ushort NCT5567_ENV_FAN_SET_AUXFAN_REG = 0x309;
+        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_VAL_H_REG = 0x4C0;
+        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_VAL_L_REG = 0x4C1;
+        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_VAL_H_REG = 0x4C2;
+        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_VAL_L_REG = 0x4C3;
+        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_VAL_H_REG = 0x4C4;
+        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_VAL_L_REG = 0x4C5;
+        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_COUNT_H_REG = 0x4B0;
+        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_COUNT_L_REG = 0x4B1;
+        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_COUNT_H_REG = 0x4B2;
+        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_COUNT_L_REG = 0x4B3;
+        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_COUNT_H_REG = 0x4B4;
+        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_COUNT_L_REG = 0x4B5;
 
-        internal const uint Nct6776_ENV_VOLT_CONFIG_VBAT_ENABLE = 0x01;
-        internal const uint Nct6776_ENV_VOLT_CONFIG_VBAT_REG = 0x05D;
-        internal const uint Nct6776_ENV_VOLT_CPUCORE_REG = 0x020;
+        internal const uint NCT5567_ENV_VOLT_CONFIG_VBAT_ENABLE = 0x01;
+        internal const uint NCT5567_ENV_VOLT_CONFIG_VBAT_REG = 0x05D;
+
+        /* Need to check
+         * internal const uint NCT5567_ENV_VOLT_CPUCORE_REG = 0x480;
         internal const uint Nct6776_ENV_VOLT_12V_REG = 0x021;
         internal const uint Nct6776_ENV_VOLT_AVCC_REG = 0x022;
         internal const uint Nct6776_ENV_VOLT_3VCC_REG = 0x023;
         internal const uint Nct6776_ENV_VOLT_VIN1_REG = 0x024;
         internal const uint Nct6776_ENV_VOLT_5V_REG = 0x025;
         internal const uint Nct6776_ENV_VOLT_VIN3_REG = 0x026;
-        internal const uint Nct6776_ENV_VOLT_3VSB_REG = 0x550;
-        internal const uint Nct6776_ENV_VOLT_VBAT_REG = 0x551;
+        */
+        internal const uint NCT5567_ENV_VOLT_3VSB_REG = 0x487;
+        internal const uint NCT5567_ENV_VOLT_VBAT_REG = 0x488;
 
-        internal const byte NCT6XXX_DEV = 0x07;
+        internal const byte NCT5567_DEV = 0x07;
 
         internal const uint NCT6XXX_PARALLEL_PORT_LDN = 0x01;
         internal const uint NCT6XXX_UART_A_LDN = 0x02;
@@ -68,7 +71,7 @@ namespace Chip.Contrl
         internal const uint NCT6XXX_GPIO_WDT1_LDN = 0x08;
         internal const uint NCT6XXX_PARALLEL_VID_LDN = 0x0D;
 
-        internal const uint NCT6XXX_ENV_CTRL_BASE_ADDR_REG = 0x60;
+        internal const uint NCT5567_ENV_CTRL_BASE_ADDR_REG = 0x60;
 
         internal static readonly uint[] FAN_Level = { 0x12, 0x18, 0x1E, 0x2D, 0x3C, 0x4B, 0x5A, 0x69, 0x78, 0x87, 0x96, 0xA5, 0xB4, 0xD2, 0xF0, 0xFF };
 
@@ -77,6 +80,7 @@ namespace Chip.Contrl
         internal const byte CHIP_REVISION_REGISTER = 0x21;
         internal const byte BASE_ADDRESS_REGISTER = 0x60;
     }
+
     public class NCT677X 
     {
     	private uint port;
@@ -107,7 +111,7 @@ namespace Chip.Contrl
 
         private static readonly uint FAN_offset = 0x03;//this offset is the level different of SYS_FAN and CPU_FAN
 
-        private static bool FAN_install_flag=false;
+        private static bool[] FAN_install_flag;
         //fasle for normal true for non-install;
 
         public NCT677X()
@@ -117,9 +121,9 @@ namespace Chip.Contrl
             NCT_init();
 
             // Control Fan in Manual Mode
-            WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_MODE_SYSFAN_REG, NCT6776_Constants.Nct6776_ENV_FAN_MODE_FAN_MANUAL_MODE);
-            WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_MODE_CPUFAN_REG, NCT6776_Constants.Nct6776_ENV_FAN_MODE_FAN_MANUAL_MODE);
-            WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_MODE_AUXFAN_REG, NCT6776_Constants.Nct6776_ENV_FAN_MODE_FAN_MANUAL_MODE);
+            WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_MODE_SYSFAN_REG, NCT5567_Constants.NCT5567_ENV_FAN_MODE_FAN_MANUAL_MODE);
+            WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_MODE_CPUFAN_REG, NCT5567_Constants.NCT5567_ENV_FAN_MODE_FAN_MANUAL_MODE);
+            WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_MODE_AUXFAN_REG, NCT5567_Constants.NCT5567_ENV_FAN_MODE_FAN_MANUAL_MODE);
 
             /*
              // Enable temperature sensor 
@@ -143,41 +147,69 @@ namespace Chip.Contrl
 
             // Enable VBAT sensor 
             nct6XXX_write_value(Nct6776_ENV_VOLT_CONFIG_VBAT_REG, (u8)(Nct6776_ENV_VOLT_CONFIG_VBAT_ENABLE));
-
+           
             // Enable super io hw monitor 
             tmp = nct6XXX_read_value(NCT6XXX_ENV_HWM_CONFIG_REG);
             tmp |= NCT6XXX_ENV_HWM_CONFIG_START;
             nct6XXX_write_value(NCT6XXX_ENV_HWM_CONFIG_REG, (u8)tmp);
             */
-            if(Enclsoure.Enclsoure_class.Model_ID != Enclsoure.Enclsoure_class.Model_VA8020)
+            if (Enclsoure.Enclsoure_class.Model_ID != Enclsoure.Enclsoure_class.Model_VA8020)
             {
-                FanRegisters = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_SET_CPUFAN_REG };
-                FanRegisters_high = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_GET_CPUFAN_COUNT_H_REG };
-                FanRegisters_low = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_GET_CPUFAN_COUNT_L_REG };
+                FanRegisters = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_SET_CPUFAN_REG };
+                FanRegisters_high = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_GET_CPUFAN_COUNT_H_REG };
+                FanRegisters_low = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_GET_CPUFAN_COUNT_L_REG };
             }
             else
             {
-                FanRegisters = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_SET_CPUFAN_REG, NCT6776_Constants.Nct6776_ENV_FAN_SET_SYSFAN_REG };
-                FanRegisters_high = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_GET_CPUFAN_COUNT_H_REG, NCT6776_Constants.Nct6776_ENV_FAN_GET_SYSFAN_COUNT_H_REG };
-                FanRegisters_low = new ushort[] { NCT6776_Constants.Nct6776_ENV_FAN_GET_CPUFAN_COUNT_L_REG, NCT6776_Constants.Nct6776_ENV_FAN_GET_SYSFAN_COUNT_L_REG };
+                FanRegisters = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_SET_CPUFAN_REG, NCT5567_Constants.NCT5567_ENV_FAN_SET_SYSFAN_REG };
+                FanRegisters_high = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_GET_CPUFAN_COUNT_H_REG, NCT5567_Constants.NCT5567_ENV_FAN_GET_SYSFAN_COUNT_H_REG };
+                FanRegisters_low = new ushort[] { NCT5567_Constants.NCT5567_ENV_FAN_GET_CPUFAN_COUNT_L_REG, NCT5567_Constants.NCT5567_ENV_FAN_GET_SYSFAN_COUNT_L_REG };
             }
             SIO_FAN_NUM = Convert.ToUInt32(FanRegisters.Length);
+            FAN_install_flag = new bool[SIO_FAN_NUM];
+            for (int i = 0; i < SIO_FAN_NUM; i++)
+                FAN_install_flag[i] = false;
         }
 
         private void NCT_init()
         {
+            uint ChipID = 0x00;
             WinbondNuvotonFintekEnter();
-            Nct6XXX_LDN_select(NCT6776_Constants.NCT6XXX_HW_MONITOR_LDN);
-            port = Readword(NCT6776_Constants.NCT6XXX_ENV_CTRL_BASE_ADDR_REG);
+            Nct6XXX_LDN_select(NCT5567_Constants.NCT6XXX_HW_MONITOR_LDN);
+
+            ChipID=Readword(NCT5567_Constants.CHIP_ID_REGISTER);
+            if (ChipID == 0xD121)
+            {
+                // For NCT5567
+                // - 1V    => reg : 0x480
+                // - 5V    => reg : 0x48D
+                // - 12V   => reg : 0x48C
+                // - 3.3V  => reg : 0x483
+                voltageRegisters = new ushort[] { 0x480, 0x48D, 0x48C, 0x483 };
+            }
+
+            else if (ChipID == 0xC333)
+            {
+                // For NCT6776
+                // - 1V    => reg : 0x20
+                // - 5V    => reg : 0x26
+                // - 12V   => reg : 0x25
+                // - 3.3V  => reg : 0x23
+                voltageRegisters = new ushort[] { 0x020, 0x026, 0x025, 0x023 };
+            }
+
+
+            port = Readword(NCT5567_Constants.NCT5567_ENV_CTRL_BASE_ADDR_REG);
             Nct6XXX_exit();
 
         }
-        public void Get_Fan(ref uint?[] Fan)
+        public void Get_Fan(ref uint?[,] Fan)
 		{
 			
 			int fans = 0;
 			int fanCount = 0;
-			for (int i = 0; i < FanRegisters.Length; i++)
+            uint realFanSpeed = 0;
+            for (int i = 0; i < FanRegisters.Length; i++)
             {
 				int Fan_Level = ReadByte(FanRegisters[i]);
 				byte Speed_high = ReadByte(FanRegisters_high[i]); // CPU fan Speed
@@ -188,73 +220,106 @@ namespace Chip.Contrl
 				if (( Speed_high== 0xFF) && (Speed_low == 0x1F))
 				{
 					fans = 0;
-                    if (FAN_install_flag == false)
+                    if (FAN_install_flag[i] == false)
                     {
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_NOT_INSTALLED,
                                               Convert.ToUInt16(i));
-                        FAN_install_flag = true;
+                        FAN_install_flag[i] = true;
+                        Enclsoure.Enclsoure_class.Fan_error += 1;
+                        Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
                     }
+
+
+                    Fan[i, 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
                 }
 				else
 				{
 					fanCount = (Speed_high << 5) + (Speed_low & 0x1F);
 					FanSpeed = fanCount >> 4;
-					fans = (Fan_Level << 16) | (FanSpeed);
-                    if (FAN_install_flag == true)
+                    NCT_get_fan_speed_trans(Convert.ToUInt32(FanSpeed), ref realFanSpeed);
+                    fans = (Fan_Level << 16) | (Convert.ToInt16(realFanSpeed));
+                    if (FAN_install_flag[i] == true)
                     {
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_FUNCTIONAL,
                                               Convert.ToUInt16(i));
-                        FAN_install_flag = false;
+                        FAN_install_flag[i] = false;
+                        Enclsoure.Enclsoure_class.Fan_error -= 1;
+                        Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
                     }
-
+                    Fan[i, 1] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
+                    if (0 < realFanSpeed && realFanSpeed < 600)
+                    {
+                        Fan[i, 1] = Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING;
+                    }
                 }
-				Fan[i] = Convert.ToUInt32(fans);
+				Fan[i,0] = Convert.ToUInt32(fans);
 			}
             
 
 		}
 
+        public void NCT_get_fan_speed_trans(uint fanSpeed, ref uint realFanSpeed)
+        {
+            /* LOCAL VARIABLES DECLARATION
+             */
+
+
+            /* BODY
+             */
+            if (fanSpeed != 0 && fanSpeed != 255)
+            {
+                realFanSpeed = ((1350 * 1000) / (fanSpeed * 16));
+            }
+            else
+            {
+                realFanSpeed = 0;
+            }
+
+            return;
+        }
+
         public void Set_Fan(uint fanNum, uint level)
         {
             uint fanlevel = 0;
+
            // Console.WriteLine("fanNum =  0x{0:x}", fanNum);
             switch (fanNum)
             {
-                case NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN:
+                case NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN:
                     level += FAN_offset;//offset
                     level= (level > 15) ?  15 : level;
-                    fanlevel = NCT6776_Constants.FAN_Level[level];
+                    fanlevel = NCT5567_Constants.FAN_Level[level];
                     //fanlevel = level;
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_CPUFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_CPUFAN_REG, fanlevel);
                     CPU_Fan_Level = level;
                     break;
 
-                case NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN:
-                    fanlevel = NCT6776_Constants.FAN_Level[level];
+                case NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN:
+                    fanlevel = NCT5567_Constants.FAN_Level[level];
                     //fanlevel = level;
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_SYSFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_SYSFAN_REG, fanlevel);
                     SYS_Fan_Level = level;
                     break;
 
-                case NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_AUXTIN:
-                    fanlevel = NCT6776_Constants.FAN_Level[level];
+                case NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_AUXTIN:
+                    fanlevel = NCT5567_Constants.FAN_Level[level];
                    // fanlevel = level;
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_AUXFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_AUXFAN_REG, fanlevel);
                     AUX_Fan_Level = level;
                     break;
 
-                case NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_ALL:
-                    fanlevel = NCT6776_Constants.FAN_Level[level];
+                case NCT5567_Constants.NCT5567_ENV_CTRL_FAN_ALL:
+                    fanlevel = NCT5567_Constants.FAN_Level[level];
                     //fanlevel = level;
                     //CPU_Fan_Level = fanlevel;
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_CPUFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_CPUFAN_REG, fanlevel);
 
                     //fanlevel = NCT6776_Constants.FAN_Level[level];
 
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_SYSFAN_REG, fanlevel);
-                    WriteByte(NCT6776_Constants.Nct6776_ENV_FAN_SET_AUXFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_SYSFAN_REG, fanlevel);
+                    WriteByte(NCT5567_Constants.NCT5567_ENV_FAN_SET_AUXFAN_REG, fanlevel);
 
                     CPU_Fan_Level = SYS_Fan_Level = AUX_Fan_Level = level;
                     break;
@@ -286,12 +351,7 @@ namespace Chip.Contrl
 
 		public void Get_Voltage(ref uint?[] voltages)
 		{
-            // For 3120, JKPI 8100(3340), Sony 3340, Channel 3340
-            // - 1V    => reg : 0x20
-            // - 5V    => reg : 0x26
-            // - 12V   => reg : 0x25
-            // - 3.3V  => reg : 0x23
-			voltageRegisters = new ushort[] { 0x020, 0x026, 0x025, 0x023 };
+
 			voltageTypes = new VoltageType[] { VoltageType.VOLTAGE_TYPE_1V, VoltageType.VOLTAGE_TYPE_5V, VoltageType.VOLTAGE_TYPE_12V, VoltageType.VOLTAGE_TYPE_3_3V };
             for (int i = 0; i < voltages.Length; i++)
             {
@@ -323,8 +383,8 @@ namespace Chip.Contrl
         {	
            	int all;
            	WinbondNuvotonFintekEnter();
-           	byte id = ReadREGByte(NCT6776_Constants.CHIP_ID_REGISTER);
-      		byte revision = ReadREGByte(NCT6776_Constants.CHIP_REVISION_REGISTER);
+           	byte id = ReadREGByte(NCT5567_Constants.CHIP_ID_REGISTER);
+      		byte revision = ReadREGByte(NCT5567_Constants.CHIP_REVISION_REGISTER);
 			all = ((id<<8)|revision);
             Nct6XXX_exit();   
             return all;
@@ -333,7 +393,7 @@ namespace Chip.Contrl
         private void Nct6XXX_LDN_select(uint bank)
         {
 
-            Ring0.WriteIoPort(registerPort, NCT6776_Constants.NCT6XXX_DEV);
+            Ring0.WriteIoPort(registerPort, NCT5567_Constants.NCT5567_DEV);
             Ring0.WriteIoPort(valuePort, Convert.ToByte(bank));
 
             return;

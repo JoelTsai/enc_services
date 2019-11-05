@@ -26,10 +26,22 @@ namespace Enclsoure
     {
 
         internal const uint ENC_TEMP_INVALID_VALUE = 0x8000;
+        internal const uint ENC_TEMP_STAT_NORMAL = 0x0000;
         internal const uint ENC_TEMP_STAT_OC = 0x0001;/* over critical */
         internal const uint ENC_TEMP_STAT_OW = 0x0002; /* over warning */
         internal const uint ENC_TEMP_STAT_UC = 0x0004;/* under critical */
         internal const uint ENC_TEMP_STAT_UW = 0x0008;/* under warning */
+
+        internal const uint VOL_STS_NORMAL = 0x0;
+        internal const uint VOL_STS_CRIT_OVER = 0x1;
+        internal const uint VOL_STS_WARN_OVER = 0x2;
+        internal const uint VOL_STS_CRIT_UNDER = 0x4;
+        internal const uint VOL_STS_WARN_UNDER = 0x8000;
+
+        internal const uint FAN_OPERATIONAL = 0;
+        internal const uint FAN_MALFUNCTIONING = 1;
+        internal const uint FAN_NOT_INSTALLED = 2;
+        internal const uint FAN_STS_UNKNOWN = 0x80;
     }
 
 
@@ -39,7 +51,7 @@ namespace Enclsoure
         public uint?[] all_temperatures;
         public uint?[] all_fans;
         public uint?[] all_leds;
-        //public uint?[] all_Hdd_temp;
+
     };
 
     internal struct TEMPOBJ
@@ -64,6 +76,7 @@ namespace Enclsoure
             for (int i = 0; i < Length; i++)
             {
                 prev_temp[i] = Enclsoure_Constants.ENC_TEMP_INVALID_VALUE;
+                cur_stat[i] = 0;
                 prev_stat[i] = 0;
                 Temp_OC_threshold[i] = 50;
                 Temp_OW_threshold[i] = 43;
@@ -141,10 +154,11 @@ namespace Enclsoure
         public  static ushort Model_ID = 0;
 
 
+
         private uint?[] NCT_voltages = new uint?[0];
         private uint?[] NCT_temperatures = new uint?[0];
-        private uint?[] NCT_fans = new uint?[0];
-        private uint?[] SMB_fans = new uint?[0];
+        private uint?[,] NCT_fans = new uint?[0,0];
+        private uint?[,] SMB_fans = new uint?[0,0];
         private uint?[] TCA_leds = new uint?[0];
         private uint?[] CPU_temperatures = new uint?[0];
 
@@ -157,8 +171,14 @@ namespace Enclsoure
         private const uint FAN_Max = 0x0004;
 
 
+        internal static short Fan_error = 0;
         private uint Fan_control_flag = 0;
-
+        public static  uint Fan_color = TCA6416_Constants.ENC_LED_GREEN;
+        public static uint GlobeError_color = TCA6416_Constants.ENC_LED_GREEN;
+        internal static bool FAN_LED_trigger = false;
+        internal static bool GlobeError_LED_trigger = false;
+        internal static uint NET_LED = 0;
+        internal static uint OPAS_LED = 0;
         public void Program()
         {
             PCHSMBUS.PCHSMBUS_init();
@@ -176,9 +196,15 @@ namespace Enclsoure
 
         }
 
+        private void Init_array(uint?[] target)
+        {
+            for (int i = 0; i < target.Length; i++)
+                target[i] = 0x00;
+
+        }
         public void FanInit()
         {
-            NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_ALL, FAN_LEVEL);
+            NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_ALL, FAN_LEVEL);
             if (Model_ID != Model_VA8020)
             {
                 NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
@@ -194,16 +220,15 @@ namespace Enclsoure
             NCT_temperatures = new uint?[1];
             CPU_temperatures = new uint?[1];
             TCA_leds = new uint?[2];
-            NCT_fans = new uint?[NCT677X.SIO_FAN_NUM];
+            NCT_fans = new uint?[NCT677X.SIO_FAN_NUM,2];
             if (Model_ID != Model_VA8020)
             {
-                SMB_fans = new uint?[1];
+                SMB_fans = new uint?[2,2];
             }
-            outdata.all_fans = new uint?[NCT_fans.Length+SMB_fans.Length];
+            outdata.all_fans = new uint?[(NCT_fans.Length+SMB_fans.Length)/2];
             outdata.all_voltages = new uint?[NCT_voltages.Length];
             outdata.all_temperatures = new uint?[NCT_temperatures.Length + CPU_temperatures.Length];
             outdata.all_leds = new uint?[TCA_leds.Length];
-           // outdata.all_Hdd_temp = new uint?[I2connection.NumOfHDSlots];
 
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
@@ -217,12 +242,26 @@ namespace Enclsoure
             Enclosure_GET_volate();
             Enclosure_GET_temperatures();
             Enclosure_GET_led();
+            Fan_LED_control();
             VerifyPDtemp();
             /*if only use equal mark and after clear the target will also clear.*/
-            Outdata = new Dictionary<string, uint?[]>(sensorData); 
-            sensorData.Clear();
+
             Thermal_Management();
 
+            for (int i = 0; i < outdata.all_temperatures.Length; i++)
+            {
+                outdata.all_temperatures[i] = (TempObj.cur_stat[i] << 24) | outdata.all_temperatures[i];
+            }
+
+
+            sensorData.Add("Temperature", outdata.all_temperatures);
+            sensorData.Add("Fan", outdata.all_fans);
+            sensorData.Add("Voltage", outdata.all_voltages);
+            sensorData.Add("Led", outdata.all_leds);
+            //
+
+            Outdata = new Dictionary<string, uint?[]>(sensorData); 
+            sensorData.Clear();
 
         }
 
@@ -246,16 +285,32 @@ namespace Enclsoure
 
         private void Enclosure_GET_fan()
         {
+            int NTC_array_length = NCT_fans.Length / NCT_fans.Rank;
+            int SMB_array_length = SMB_fans.Length / SMB_fans.Rank;
             NCT.Get_Fan(ref NCT_fans);
-             Array.Copy(NCT_fans, outdata.all_fans, NCT_fans.Length);
+
+            //Array.Copy(NCT_fans, outdata.all_fans, NCT_fans.Length);
+            for (int i = 0; i < NTC_array_length; i++)
+            {
+               // Console.WriteLine(" NCT_fans[{1}, 1] = 0x{0:x} ", NCT_fans[i, 1], i);
+               // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
+                outdata.all_fans[i] = (NCT_fans[i, 1] << 24) | NCT_fans[i, 0];
+            }
             if (Model_ID != Model_VA8020)
             {
                 NCT7802.Nct7802y_get_fan_speed(0x01, ref SMB_fans);
-                Array.Copy(SMB_fans, 0, outdata.all_fans, NCT_fans.Length, SMB_fans.Length);
+                NCT7802.Nct7802y_get_fan_speed(0x02, ref SMB_fans);
+                // Array.Copy(SMB_fans, 0, outdata.all_fans, NCT_fans.Length, SMB_fans.Length);
+                for (int i = NTC_array_length; i < SMB_array_length + NTC_array_length; i++)
+                {
+                  //  Console.WriteLine(" SMB_fans[{1}, 1] = 0x{0:x} ", SMB_fans[i - NTC_array_length, 1], i);
+                  //  Console.WriteLine(" SMB_fans[{1}, 0] = 0x{0:x} ", SMB_fans[i - NTC_array_length, 0], i);
+                    outdata.all_fans[i] = (SMB_fans[i - NTC_array_length, 1] << 24) | SMB_fans[i - NTC_array_length, 0];
+                }
             }
-            // PrintIndexAndValues(outdata.all_fans);
 
-            sensorData.Add("Fan", outdata.all_fans);
+
+            //sensorData.Add("Fan", outdata.all_fans);
 
 
         }
@@ -263,7 +318,7 @@ namespace Enclsoure
         {
             NCT.Get_Voltage(ref NCT_voltages);
             Array.Copy(NCT_voltages, outdata.all_voltages, NCT_voltages.Length);
-            sensorData.Add("Voltage", outdata.all_voltages);
+            //sensorData.Add("Voltage", outdata.all_voltages);
 
         }
         private void Enclosure_GET_temperatures()
@@ -275,7 +330,7 @@ namespace Enclsoure
 
             Array.Copy(CPU_temperatures, 0, outdata.all_temperatures, NCT_temperatures.Length, 1);
 
-            sensorData.Add("Temperature", outdata.all_temperatures);
+            //sensorData.Add("Temperature", outdata.all_temperatures);
             
 
         }
@@ -349,9 +404,10 @@ namespace Enclsoure
                     TempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
 
                     Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-                   // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
+                    // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
                     //                      I2connection_Events.EVT_CODE_SUBSYS_TEMP_ABOVE_CRITICAL,
                     //                      0);
+
                 }
            else if (!((TempObj.prev_stat[i] & 0x03) == 0x03)&&
                      ( outdata.all_temperatures[i] > TempObj.Temp_OW_threshold[i]))
@@ -374,9 +430,10 @@ namespace Enclsoure
                         TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
                         TempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
                         Console.WriteLine("2nd time over warn-threshold.\n");
-                       // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
-                       //                       I2connection_Events.EVT_CODE_SUBSYS_TEMP_ABOVE_WARNING,
-                       //                       0);
+                        // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
+                        //                       I2connection_Events.EVT_CODE_SUBSYS_TEMP_ABOVE_WARNING,
+                        //                       0);
+
                     }
                     else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                     {
@@ -496,14 +553,14 @@ namespace Enclsoure
             switch (Control)
             {
                 case FAN_Max://MAX FAN
-                    NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN, 0xf);
+                    NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, 0xf);
                     if (Model_ID != Model_VA8020)
                     {
                         NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, 0xf);
                     }
                     else
                     {
-                        NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                        NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
                     }
                     I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                           I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_INCREASED,
@@ -516,14 +573,14 @@ namespace Enclsoure
                     if (FAN_LEVEL != 0xF)
                     {
                         FAN_LEVEL += 1;
-                        NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
+                        NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
                         if (Model_ID != Model_VA8020)
                         {
                             NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
                         }
                         else
                         {
-                            NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                            NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
                         }
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_INCREASED,
@@ -537,14 +594,14 @@ namespace Enclsoure
                     {
                         FAN_LEVEL -= 1;
                         FAN_LEVEL = FAN_LEVEL < 0x02 ? 0x02 : FAN_LEVEL ;
-                        NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
+                        NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
                         if (Model_ID != Model_VA8020)
                         {
                             NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
                         }
                         else
                         {
-                            NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                            NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
                         }
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_DECREASED,
@@ -560,26 +617,36 @@ namespace Enclsoure
            // NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN, NCT.CPU_Fan_Level);
 
         }
-
-
-        public static void PrintIndexAndValues(uint?[] myArr)
+        /*  ----Debug code ---- ****SHOW array*****
+        public static void PrintIndexAndValues(uint?[] myArr,string name)
         {
             for (int i = 0; i < myArr.Length; i++)
             {
-                Console.WriteLine("   [{0}] : 0x{1:x}", i, myArr[i]);
+                Console.WriteLine(" {2}  [{0}] : 0x{1:x}", i, myArr[i],name);
             }
             Console.WriteLine();
         }
 
+        public static void PrintIndexAndValuesDO(uint?[,] myArr, string name)
+        {
+            Console.WriteLine("!!!!{0}!!!", myArr.Length);
+            Console.WriteLine(" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            for (int i = 0; i < (myArr.Length/ myArr.Rank); i++)
+            {
+                Console.WriteLine(" {0}  [{1}][0] : 0x{2:x}",name,i,myArr[i,0]);
+                Console.WriteLine(" {0}  [{1}][1] : 0x{2:x}", name, i, myArr[i, 1]);
+            }
+            Console.WriteLine();
+            Console.WriteLine(" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        }*/
+
         public void Enclosure_SET_fan(uint?[]  Date)
         {
-            //Enc_Service.Enc_Service.FileLog("Enclosure_SET_fan in");
-            uint CPU_SET_FAN = 0;
-            uint SYS_SET_FAN = 0;
+                 uint CPU_SET_FAN = 0;
+                 uint SYS_SET_FAN = 0;
             try
             {
                 //Console.WriteLine("  Date len =  : 0x{0:x}", Date.Length);
-               // Enc_Service.Enc_Service.FileLog("try in");
                 CPU_SET_FAN = (uint)Date[0];
                 SYS_SET_FAN = (uint)Date[1];
 
@@ -587,29 +654,16 @@ namespace Enclsoure
                 Console.WriteLine("  SYS_SET_FAN =   : 0x{0:x}", SYS_SET_FAN);
 
                 if (CPU_SET_FAN != 0)
-                {
-                   // Enc_Service.Enc_Service.FileLog("CPU_SET_FAN != 0");
-                    NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_CPUTIN, CPU_SET_FAN);
-                }
-
+                    NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, CPU_SET_FAN);
                 if (Model_ID != Model_VA8020)
                 {
-                    //Enc_Service.Enc_Service.FileLog("Model_ID != Model_VA8020");
                     if (SYS_SET_FAN != 0)
-                    {
-                       // Enc_Service.Enc_Service.FileLog("SYS_SET_FAN != 0");
                         NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, SYS_SET_FAN);
-                    }
                 }
                 else
                 {
-                    //Enc_Service.Enc_Service.FileLog("Model_ID == Model_VA8020");
                     if (SYS_SET_FAN != 0)
-                    {
-                       // Enc_Service.Enc_Service.FileLog("SYS_SET_FAN != 0");
-                        NCT.Set_Fan(NCT6776_Constants.NCT6XXX_ENV_CTRL_FAN_SEN_SYSTIN, SYS_SET_FAN);
-                    }
-                     
+                     NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, SYS_SET_FAN);
                 }
                 for (int i = 0; i < Date.Length; i++)
                 {
@@ -621,7 +675,6 @@ namespace Enclsoure
             catch (Exception ex)
             {
                 Console.WriteLine("Enclosure_SET_fan fail:{0}", ex);
-                //Enc_Service.Enc_Service.EventLog.WriteEntry("Enclosure_SET_fan fail:{0}"+ ex);
             }
         }
 
@@ -646,19 +699,20 @@ namespace Enclsoure
             }
         }
 
-        public void Enclosure_SET_led(uint?[,] Date)
+        public void Enclosure_SET_led(uint?[] Date)
         {
             uint chipId;
             uint port0_data;
             uint port1_data;
-            for (int i = 0; i < Date.GetLength(0); i++)
+            for (uint i = 0; i < Date.GetLength(0); i++)
             {
-                chipId = (uint)Date[i, 0];
-                Console.WriteLine("Date=[{0:x}]", Date[i, 1]);
-                port0_data = (uint)((Date[i, 1] & 0xFF00) >> 8);
-                port1_data = (uint)Date[i, 1] & 0x00FF;
+                chipId = i;
+                Console.WriteLine("Date=[{0:x}]", Date[i]);
+                port0_data = (uint)((Date[i] & 0xFF00) >> 8);
+                port1_data = (uint)Date[i] & 0x00FF;
                 Console.WriteLine("chipId=[{0}]", chipId);
                 Console.WriteLine("port0=[{0:x}]", port0_data);
+                
                 Console.WriteLine("port1=[{0:x}]", port1_data);
                 TCA6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_0, port0_data);
                 TCA6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_1, port1_data);
@@ -671,7 +725,7 @@ namespace Enclsoure
             TCA6416.encGetLedStatus(ref TCA_leds);
            // Console.WriteLine("Length=[{0:x}]", TCA_leds.Length);
             Array.Copy(TCA_leds, outdata.all_leds, TCA_leds.Length);
-            sensorData.Add("Led", outdata.all_leds);
+            //sensorData.Add("Led", outdata.all_leds);
             /*
 			for(int i=0; i < TCA_leds.Length; i++)
 			{
@@ -679,6 +733,37 @@ namespace Enclsoure
 				Console.WriteLine("all_leds=[{0:x}]", outdata.all_leds[i]);
 			}
 			*/
+        }
+        private void Fan_LED_control()
+        {
+            if (FAN_LED_trigger == true)
+            {
+                if (Fan_error == 0)
+                {
+                    Console.WriteLine("Fan_error=0");
+                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_GREEN);
+                    if (GlobeError_LED_trigger == false)
+                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
+                    Fan_color = TCA6416_Constants.ENC_LED_GREEN;
+                }
+                else if (Fan_error == 1)
+                {
+                    Console.WriteLine("Fan_error=1");
+                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_AMBER);
+                    if (GlobeError_LED_trigger == false)
+                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
+                    Fan_color = TCA6416_Constants.ENC_LED_AMBER;
+                }
+                else if (Fan_error >= 2)
+                {
+                    Console.WriteLine("Fan_error>2");
+                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_RED);
+                    if (GlobeError_LED_trigger == false)
+                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_RED); }
+                    Fan_color = TCA6416_Constants.ENC_LED_RED;
+                }
+                FAN_LED_trigger = false;
+            }
         }
 
         public void VerifyPDtemp()

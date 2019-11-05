@@ -23,7 +23,7 @@ namespace platformwmi
         public uint?[] GetRegTemperature;// GetRegTemperature.Length = 4 * Temperature.Length
         public uint?[] GetRegVoltage;// GetRegVoltage.Length = 4 * Voltage.Length
         public uint?[] Temp_threshold;
-        public uint?[,] GetRegLed;
+        public uint?[] GetRegLed;
         public Program()
         {
             this.Enclosure = new Enclsoure_class();
@@ -147,6 +147,9 @@ namespace platformwmi
                 /*do first request check*/
                 //int stusa ;
                 //I2bHddInfo_t i2HDDtest = new I2bHddInfo_t();
+                program.GetRegistry("Init");
+                program.Enclosure.Enclosure_SET_led(program.GetRegLed);
+
                 watcher.EventArrived += new EventArrivedEventHandler(program.ChkReqRoutine);
                 watcher.Start();
                 do
@@ -207,7 +210,7 @@ namespace platformwmi
         public void ChkReqRoutine(object sender, EventArrivedEventArgs e)
         {
             Console.WriteLine("reg Chang!!!");
-            //bool request_flag = false;
+            bool request_flag = false;
             if (GetRegistry("FanConfig"))
             {
                 Enclosure.Enclosure_SET_fan(GetRegFan);
@@ -215,9 +218,28 @@ namespace platformwmi
             }
             if (GetRegistry("LedConfig"))
             {
-                Enclosure.Enclosure_SET_led(GetRegLed);
-               // request_flag = true;
+
+                //Enclosure.Enclosure_SET_led(GetRegLed);
+                request_flag = true;
             }
+            if (GetRegistry("NetLEDConfig"))
+            {
+
+                //Enclosure.Enclosure_SET_led(GetRegLed);
+                request_flag = true;
+            }
+            if (GetRegistry("OPASLEDConfig"))
+            {
+
+                //Enclosure.Enclosure_SET_led(GetRegLed);
+                request_flag = true;
+            }
+            if (request_flag)
+            {
+                Enclosure.Enclosure_SET_led(GetRegLed);
+                request_flag = false;
+            }
+
             if (GetRegistry("Temp_threshold"))
             {
                 Enclosure.Enclosure_SET_Temp_threshold(Temp_threshold);
@@ -332,20 +354,88 @@ namespace platformwmi
                         }
                         else
                         {
-                            GetRegLed = new uint?[RegValue.Length / 4, 2];
+                            GetRegLed = new uint?[RegValue.Length / 4];
+                            Console.WriteLine("RegValue.Length = [{0:x}]", RegValue.Length);
                             for (int i = 0; i < RegValue.Length; i += 4)
                             {
                                 if (i % 4 == 0)
                                 {
                                     int ledreg = ((RegValue[i + 2]) | (RegValue[i] << 8));
-                                    GetRegLed[(i / 4), 0] = (uint)(i / 4);
-                                    GetRegLed[(i / 4), 1] = Convert.ToUInt32(ledreg);
+                                   
+                                    GetRegLed[(i / 4)] = Convert.ToUInt32(ledreg);
                                     Console.WriteLine("i = [{0:x}]", i);
                                     Console.WriteLine("LedReg = [{0:x}]", ledreg);                                
                                 }
                                 //Console.WriteLine("{0}[{1}] = {2:x} ", UnitName, i + 1, GetRegVoltage[i]);
                             }
                         }
+                         break;
+
+                    case "NetLEDConfig":
+                        if (!GetRegValue(unit, ref RegValue))
+                        {
+                            // Console.WriteLine("The unit {0} should not to change !", unit);
+                            return false;
+                        }
+                        else
+                        {
+                            Enclsoure_class.NET_LED = Convert.ToUInt32(RegValue[2]) & Chip.Contrl.TCA6416_Constants.NET_REQUEST_MASK;
+                            Console.WriteLine("Enclsoure_class.NET_LED=[{0:x}]", Enclsoure_class.NET_LED);
+                        }
+                        break;
+
+                    case "OPASLEDConfig":
+                        if (!GetRegValue(unit, ref RegValue))
+                        {
+                            // Console.WriteLine("The unit {0} should not to change !", unit);
+                            return false;
+                        }
+                        else
+                        {
+                            Enclsoure_class.OPAS_LED = Convert.ToUInt32(RegValue[0]) & Chip.Contrl.TCA6416_Constants.OPAS_REQUEST_MASK;
+                            Console.WriteLine("Enclsoure_class.OPAS_LED=[{0:x}]", Enclsoure_class.OPAS_LED);
+                        }
+                        break;
+
+                case "Init":
+                    try
+                    {
+                        GetRegValue("Led", ref RegValue);
+
+                        GetRegLed = new uint?[RegValue.Length / 4];
+                        Console.WriteLine("!!RegValue.Length = [{0:x}]", RegValue.Length);
+
+                        for (int i = 0; i < RegValue.Length; i += 4)
+                        {
+                            if (i % 4 == 0)
+                            {
+                                int ledreg = ((RegValue[i + 2]) | (RegValue[i] << 8));
+                                GetRegLed[(i / 4)] = (uint)(i / 4);
+                                GetRegLed[(i / 4)] = Convert.ToUInt32(ledreg);
+                                Console.WriteLine("i = [{0:x}]", i);
+                                Console.WriteLine("LedReg = [{0:x}]", ledreg);
+                            }
+                            //Console.WriteLine("{0}[{1}] = {2:x} ", UnitName, i + 1, GetRegVoltage[i]);
+                        }
+                        for (int i = 0; i < GetRegLed.Length ; i++)
+                        {
+                                Console.WriteLine("GetRegLed[{0}]={1:x}", i, GetRegLed[i]);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        GetRegLed = new uint?[2];
+                        for (int i = 0; i < GetRegLed.Length / GetRegLed.Rank; i++)
+                        {
+                            for (int j = 0; j < GetRegLed.Rank; j++)
+                                GetRegLed[i] = 0;
+                         }
+
+                        for (int i = 0; i < GetRegLed.Length; i++)
+                        {
+                            Console.WriteLine("GetRegLed[{0}]={1:x}", i, GetRegLed[i]);
+                        }
+                    }
                         break;
 
                 default:
@@ -356,6 +446,7 @@ namespace platformwmi
 
         private bool GetRegValue(string UnitName, ref byte[] RegValue)
         {
+            bool Trigger = false;
             try
             {
                 RegistryKey localKey = null, softwareKey = null, key4Driver = null;
@@ -370,27 +461,28 @@ namespace platformwmi
                 RegValue = new byte[(ValueUnit[0] & 0x3F) * 4];
                 //Console.WriteLine("Length=[{0}]", RegValue.Length);
 
-                UInt32 FanFlag = (UInt32)(ValueUnit[0] & 0x80);
-                if (FanFlag == 0)
-                {
-                    //Console.WriteLine("bool=[{0}]", ValueUnit[0]);
-                    key4Driver.Close();
-                    softwareKey.Close();
-                    localKey.Close();
-                    return false;
-                }
+
+                Trigger = (ValueUnit[0] & 0x80)==0x80;
+
 
                 for (int i = 0; i < RegValue.Length; i++)
                 {
                     RegValue[i] = ValueUnit[i + 4];
                 }
-
-                ValueUnit[0] = Convert.ToByte(Convert.ToInt16(ValueUnit[0]) & 0x7F);
-                key4Driver.SetValue(UnitName, ValueUnit, RegistryValueKind.Binary);
+                if (Trigger)
+                {
+                    ValueUnit[0] = Convert.ToByte(Convert.ToInt16(ValueUnit[0]) & 0x7F);
+                    key4Driver.SetValue(UnitName, ValueUnit, RegistryValueKind.Binary);
+                }
                 key4Driver.Close();
                 softwareKey.Close();
                 localKey.Close();
-                return true;
+                return Trigger;
+            }
+            catch (NullReferenceException)
+            {
+                Console.WriteLine("{0} are not create", UnitName);
+                return false;
             }
             catch (Exception ex)
             {

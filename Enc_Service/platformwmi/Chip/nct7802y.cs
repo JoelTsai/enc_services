@@ -7,10 +7,6 @@
 **                    All Rights  Reserved.                                  **
 **---------------------------------------------------------------------------*/
 using System;
-using System.Threading;
-using System.Globalization;
-using System.Text;
-using Enc_Service.platformwmi;
 using i2api;
 
 
@@ -199,10 +195,56 @@ namespace Chip.Contrl
     public class NCT7802
     {
         //public PCHSMBUS SMB;
-        private static bool FAN_install_flag = false;
+        private static bool[] FAN_install_flag;
 
         public NCT7802()
         {
+          uint  addr = NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR;
+            FAN_install_flag = new bool[2];
+            for (int i = 0; i < FAN_install_flag.Length; i++)
+                FAN_install_flag[i] = false;
+
+            if(Enclsoure.Enclsoure_class.Model_ID==Enclsoure.Enclsoure_class.Model_VA8100)
+            {
+                uint data = 0x0;
+                uint offset = 0x0;
+                    /* Enable GPIO 5 */
+                    data = 0x10;
+                    offset = NCT7802_Constants.NCT7802Y_GPIO_ENABLE_REG;
+                    if (Nct7802y_write_value(addr, offset, ref data) == -1)
+                    {
+                    Console.WriteLine("Nct7802y I2C write fail.\n");
+
+                    }
+
+                    /* Set GPIO 5 to output mode */
+                    data = 0x10;
+                    offset = NCT7802_Constants.NCT7802Y_GPIO_MODE_SEL_REG;
+                    if (Nct7802y_write_value(addr, offset, ref data) == -1)
+                    {
+                    Console.WriteLine("Nct7802y I2C write fail.\n");
+
+                    }
+
+                    /* Set fan contorl output type */
+                    data = 0x0;
+                    offset = NCT7802_Constants.NCT7802Y_FAN_OUTPUT_TYPE_REG;
+                    if (Nct7802y_write_value(addr, offset, ref data) == -1)
+                    {
+                    Console.WriteLine("Nct7802y I2C write fail.\n");
+
+                    }
+
+                    /* Set fan contorl output mode */
+                    data = 0x0;
+                    offset = NCT7802_Constants.NCT7802Y_FAN_OUTPUT_MODE_REG;
+                    if (Nct7802y_write_value(addr, offset, ref data) == -1)
+                    {
+                    Console.WriteLine("Nct7802y I2C write fail.\n");
+
+                    }
+                
+            }
            // this.SMB = new PCHSMBUS();
 
         }
@@ -231,22 +273,24 @@ namespace Chip.Contrl
 
             if (Nct7802y_write_value(addr, NCT7802_Constants.NCT7802Y_BANK_SEL_REG, ref data) == -1)
             {
-                DebugLogger.WriteLine("NCT7802Y I2C write fail.\n");
+               // DebugLogger.WriteLine("NCT7802Y I2C write fail.\n");
                 return -1;
 
             }
             return 0;
         }
 
-        public void Nct7802y_get_fan_speed(uint FanNum, ref uint?[] Fandata)
+        public void Nct7802y_get_fan_speed(uint FanNum, ref uint?[,] Fandata)
         {
             uint offset = 0;
-            uint  ldata, hdata;
+            uint ldata, hdata;
             uint addr;
             uint Fanlevel = 0;
             uint fanCount;
             uint fanSpeed;
+            uint realFanSpeed = 0;
             addr = NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR;
+
             Nct7802y_set_bank(NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_BANK_DATA_0);
 
 
@@ -269,7 +313,7 @@ namespace Chip.Contrl
             {
                 Console.WriteLine("Nct7802y I2C read fail.\n");
             }
-
+            Console.WriteLine("FanNum={0:x} hdata={1:x}.\n", FanNum, hdata);
             ldata = 0;
             offset = NCT7802_Constants.NCT7802Y_FAN_LOW_COUNT_REG;
 
@@ -281,13 +325,17 @@ namespace Chip.Contrl
             if ((hdata == 0xFF) && (ldata == 0xF8))
             {
                 fanSpeed = 0;
-                if (FAN_install_flag == false)
+                if (FAN_install_flag[FanNum-1] == false)
                 {
                     I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                           I2connection_Events.EVT_CODE_COOLING_DEVICE_NOT_INSTALLED,
                                           1);
-                    FAN_install_flag = true;
+                    FAN_install_flag[FanNum-1] = true;
+                    Enclsoure.Enclsoure_class.Fan_error += 1;
+                    Console.WriteLine("NO install fanerror={0}.", Enclsoure.Enclsoure_class.Fan_error);
+                    Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
                 }
+                Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
             }
 
             else
@@ -301,13 +349,16 @@ namespace Chip.Contrl
                 {
                     fanSpeed = 0;
                 }
-                if (FAN_install_flag == true)
+                if (FAN_install_flag[FanNum-1] == true)
                 {
                     I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                           I2connection_Events.EVT_CODE_COOLING_DEVICE_FUNCTIONAL,
                                           1);
-                    FAN_install_flag = false;
+                    FAN_install_flag[FanNum-1] = false;
+                    Enclsoure.Enclsoure_class.Fan_error -= 1;
+                    Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
                 }
+                Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
             }
 
             /*get speed level*/
@@ -319,11 +370,11 @@ namespace Chip.Contrl
             /* Get fan speed level */
             switch (FanNum)
             {
-                case NCT7802_Constants.NCT7802Y_2U6_BP_DEVICE_FAN0:
+                case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN0:
                     offset = NCT7802_Constants.NCT7802Y_FAN_FANCTL1_REG;
                     break;
 
-                case NCT7802_Constants.NCT7802Y_2U6_BP_DEVICE_FAN1:
+                case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN1:
                     offset = NCT7802_Constants.NCT7802Y_FAN_FANCTL2_REG;
                     break;
 
@@ -335,8 +386,13 @@ namespace Chip.Contrl
             {
                 Console.WriteLine("Nct7802y I2C read fail.\n");
             }
-
-            Fandata[0] = (Fanlevel << 16) | (fanSpeed);
+            Nct7802y_get_fan_speed_trans(fanSpeed,ref realFanSpeed);
+            Console.WriteLine("realFanSpeed={0:x}", realFanSpeed);
+            if (0 < realFanSpeed && realFanSpeed < 600)
+            {
+                Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING;
+            }
+            Fandata[FanNum-1,0] = (Fanlevel << 16) | (realFanSpeed);
         }
 
         public void Nct7802y_get_fan_speed_trans(uint fanSpeed, ref uint realFanSpeed)
@@ -361,7 +417,7 @@ namespace Chip.Contrl
 
         public void Nct7802y_set_fan_speed(uint fanNum, uint level)
         {
-            //Enc_Service.Enc_Service.FileLog("Nct7802y_set_fan_speed");
+
             uint offset1 = 0;
             uint offset2 = 0;
             uint fanlevel = 0;
@@ -389,10 +445,8 @@ namespace Chip.Contrl
                 default:
                     break;
             }
-            //Enc_Service.Enc_Service.FileLog("level="+level);
 
             fanlevel = NCT7802_Constants.FAN_Level[level];
-            //Enc_Service.Enc_Service.FileLog("fanlevel="+fanlevel);
             //fanlevel = level;
             Console.WriteLine("  level =  : 0x{0:x}", fanlevel);
             if (Nct7802y_write_value(addr, offset1, ref fanlevel) == -1)
@@ -407,6 +461,8 @@ namespace Chip.Contrl
                     Console.WriteLine("Nct7802y I2C write fail.\n");
                 }
             }
+
+
         }
     }
 }

@@ -71,6 +71,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="platformwmi\Chip\LPCIO.cs" />
     <Compile Include="Prom_EnclosureS.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -80,7 +81,6 @@
     <Compile Include="platformwmi\BigEndianBinaryWriter.cs" />
     <Compile Include="platformwmi\Chip\CPU.cs" />
     <Compile Include="platformwmi\Chip\HDD.cs" />
-    <Compile Include="platformwmi\Chip\NCT6776.cs" />
     <Compile Include="platformwmi\Chip\nct7802y.cs" />
     <Compile Include="platformwmi\Chip\PCH200.cs" />
     <Compile Include="platformwmi\Chip\Tca6416a.cs" />

@@ -19,6 +19,12 @@ namespace Chip.Contrl
         public const uint WLEN = 2;
         public const uint DWLEN = 4;
 
+        public const uint ENC_LED_OFF = 0x00;
+        public const uint ENC_LED_GREEN = 0x01;
+        public const uint ENC_LED_RED = 0x02;
+        public const uint ENC_LED_AMBER = 0x03;
+        public const uint ENC_LED_DARK = 0x80;
+
         public const uint TCA6416A_I2C_ADDR_LO = 0x20;
 		public const uint TCA6416A_I2C_ADDR_HI = 0x21;
 
@@ -37,6 +43,22 @@ namespace Chip.Contrl
         public const uint TCA6416A_GPIO_IN 	= 1;
 		public const uint TCA6416A_GPIO_OUT = 0;
 
+        public const uint TCA6416A_GPIO_PIN_0 = 0;
+        public const uint TCA6416A_GPIO_PIN_1 = 1;
+        public const uint TCA6416A_GPIO_PIN_2 = 2;
+        public const uint TCA6416A_GPIO_PIN_3 = 3;
+        public const uint TCA6416A_GPIO_PIN_4 = 4;
+        public const uint TCA6416A_GPIO_PIN_5 = 5;
+        public const uint TCA6416A_GPIO_PIN_6 = 6;
+        public const uint TCA6416A_GPIO_PIN_7 = 7;
+        public const uint TCA6416A_GPIO_PIN_8 = 8;
+        public const uint TCA6416A_GPIO_PIN_9 = 9;
+        public const uint TCA6416A_GPIO_PIN_10 = 10;
+        public const uint TCA6416A_GPIO_PIN_11 = 11;
+        public const uint TCA6416A_GPIO_PIN_12 = 12;
+        public const uint TCA6416A_GPIO_PIN_13 = 13;
+        public const uint TCA6416A_GPIO_PIN_14 = 14;
+        public const uint TCA6416A_GPIO_PIN_15 = 15;
 
         public const uint ENC_LED_HDD_0         = 0;
 		public const uint ENC_LED_HDD_1         = 1;
@@ -68,13 +90,18 @@ namespace Chip.Contrl
 		public const uint ENC_LED_ETH2          = 27;
 
 		public static ushort[] LedRegisters = new ushort[] { 0x20 ,0x21 };
+        public const uint FW_REQUEST_PORT0_MASK = 0x30;
+        public const uint FW_REQUEST_PORT1_MASK = 0x00;
+        public const uint NET_REQUEST_MASK = 0x3C;
+        public const uint OPAS_REQUEST_MASK = 0x03;
 
-	}//end of Constants
+    }//end of Constants
 	
 	public class TCA6416
 	{
-		//public PCHSMBUS SMB;
-		public TCA6416()
+        private const uint TCA6416A_GPIO_MAX = 15;
+        //public PCHSMBUS SMB;
+        public TCA6416()
 		{
             //this.SMB = new PCHSMBUS();
             uint data_temp = 0x00;
@@ -97,6 +124,8 @@ namespace Chip.Contrl
 
             data_temp = 0x44;
             Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_0, ref data_temp);
+            data_temp = 0x1;
+            Tca6416a_write_value(TCA6416_Constants.TCA6416A_I2C_ADDR_HI, TCA6416_Constants.TCA6416A_OUTPUT_PORT_1, ref data_temp);
         }
 
 		public int Tca6416a_write_value(uint addr, uint reg, ref uint data)
@@ -169,13 +198,73 @@ namespace Chip.Contrl
 					break;
 				case 1:
 					addr=TCA6416_Constants.TCA6416A_I2C_ADDR_HI;
-					break;
+                    if (port == TCA6416_Constants.TCA6416A_PORT_0)
+                    {
+                       uint gpio_G = TCA6416_Constants.TCA6416A_GPIO_PIN_2;
+                       uint gpio_R = TCA6416_Constants.TCA6416A_GPIO_PIN_3;
+                       uint temp = 1;
+
+                        PinId &= TCA6416_Constants.FW_REQUEST_PORT0_MASK;
+                        switch (Enclsoure.Enclsoure_class.Fan_color)
+                        {
+                            case TCA6416_Constants.ENC_LED_GREEN:
+                                PinId |= temp << Convert.ToInt32(gpio_G);
+                                PinId &= ~(temp << Convert.ToInt32(gpio_R));
+                                break;
+
+                            case TCA6416_Constants.ENC_LED_RED:
+                                PinId &= ~(temp << Convert.ToInt32(gpio_G));
+                                PinId |= temp << Convert.ToInt32(gpio_R);
+                                break;
+
+                            case TCA6416_Constants.ENC_LED_AMBER:
+                                PinId |= temp << Convert.ToInt32(gpio_G);
+                                PinId |= temp << Convert.ToInt32(gpio_R);
+                                break;
+
+                            case TCA6416_Constants.ENC_LED_OFF:
+                            case TCA6416_Constants.ENC_LED_DARK:
+                                PinId &= ~(temp << Convert.ToInt32(gpio_G));
+                                PinId &= ~(temp << Convert.ToInt32(gpio_R));
+                                break;
+
+                            default:
+                                //ENC_DBG_PRINT("Led get error status %d\n", status);
+                                break;
+                        }
+                        if ((PinId & TCA6416_Constants.FW_REQUEST_PORT0_MASK) == 0x20)
+                        { Enclsoure.Enclsoure_class.GlobeError_LED_trigger = true; }
+                        else
+                        { Enclsoure.Enclsoure_class.GlobeError_LED_trigger = false; }
+
+                        PinId |= 0x40;//POWER LED Enable
+                        PinId |= Enclsoure.Enclsoure_class.OPAS_LED;
+
+
+                    }
+                    if (port == TCA6416_Constants.TCA6416A_PORT_1)
+                    {
+                        PinId &= TCA6416_Constants.FW_REQUEST_PORT1_MASK;
+                        uint gpio_G = TCA6416_Constants.TCA6416A_GPIO_PIN_0;
+                        uint gpio_R = TCA6416_Constants.TCA6416A_GPIO_PIN_1;
+                        uint temp = 1;
+
+                        if (Enclsoure.Enclsoure_class.Fan_color== TCA6416_Constants.ENC_LED_RED||
+                           Enclsoure.Enclsoure_class.GlobeError_LED_trigger)
+                        {
+                            PinId &= ~(temp << Convert.ToInt32(gpio_G));
+                            PinId |= temp << Convert.ToInt32(gpio_R);
+                        }
+                        else
+                        {
+                            PinId |= temp << Convert.ToInt32(gpio_G);
+                            PinId &= ~(temp << Convert.ToInt32(gpio_R));
+                        }
+                        PinId |= Enclsoure.Enclsoure_class.NET_LED;
+                    }
+
+                    break;
 			}
-			
-			
-			Console.WriteLine("addr   =[{0:x}]", addr);
-			Console.WriteLine("port   =[{0:x}]", port);
-			Console.WriteLine("PinId  =[{0:x}]", PinId);
 			tca6416a_set_gpio_port_value (addr, port, ref PinId);
 			
 			Console.WriteLine("encSetLedStatus End!");
@@ -213,5 +302,70 @@ namespace Chip.Contrl
 			*/
 			//Console.WriteLine("encGetLedStatus End!");
 		}
+        public void NCT6414_FAN_Control(uint LEDID, uint status)
+        {
+            uint bitmap = 0;
+            uint addr = 0; 
+            uint gpio_G = 0; 
+            uint gpio_R = 0; 
+            uint port = 0;
+            uint temp = 0x01;
+            switch(LEDID)
+            {
+                case TCA6416_Constants.ENC_LED_GLOBE_ERR:
+                    addr = TCA6416_Constants.TCA6416A_I2C_ADDR_HI;
+                    gpio_G = TCA6416_Constants.TCA6416A_GPIO_PIN_8;
+                    gpio_R = TCA6416_Constants.TCA6416A_GPIO_PIN_9;
+                    break;
+                case TCA6416_Constants.ENC_LED_FAN:
+                    addr = TCA6416_Constants.TCA6416A_I2C_ADDR_HI;
+                    gpio_G = TCA6416_Constants.TCA6416A_GPIO_PIN_2;
+                    gpio_R = TCA6416_Constants.TCA6416A_GPIO_PIN_3;
+                    break;
+
+
+            }
+            if ((gpio_G > 7) && (gpio_G <= TCA6416A_GPIO_MAX) ||
+                (gpio_R > 7) && (gpio_R <= TCA6416A_GPIO_MAX))
+            {
+                gpio_G -= 8;
+                gpio_R -= 8;
+                port = TCA6416_Constants.TCA6416A_INPUT_PORT_1;
+            }
+            else
+            {
+                port = TCA6416_Constants.TCA6416A_INPUT_PORT_0;
+            }
+            tca6416a_get_gpio_port_value(addr, port, ref bitmap);
+
+            switch (status)
+            {
+                case TCA6416_Constants.ENC_LED_GREEN:
+                    bitmap |= temp << Convert.ToInt32(gpio_G);
+                    bitmap &= ~(temp << Convert.ToInt32(gpio_R));
+                    break;
+
+                case TCA6416_Constants.ENC_LED_RED:
+                    bitmap &= ~(temp << Convert.ToInt32(gpio_G));
+                    bitmap |= temp << Convert.ToInt32(gpio_R);
+                    break;
+
+                case TCA6416_Constants.ENC_LED_AMBER:
+                    bitmap |= temp << Convert.ToInt32(gpio_G);
+                    bitmap |= temp << Convert.ToInt32(gpio_R);
+                    break;
+
+                case TCA6416_Constants.ENC_LED_OFF:
+                case TCA6416_Constants.ENC_LED_DARK:
+                    bitmap &= ~(temp << Convert.ToInt32(gpio_G));
+                    bitmap &= ~(temp << Convert.ToInt32(gpio_R));
+                    break;
+
+                default:
+                    //ENC_DBG_PRINT("Led get error status %d\n", status);
+                    break;
+            }
+            tca6416a_set_gpio_port_value(addr, port, ref bitmap);
+        }
     }
 }
