@@ -111,18 +111,21 @@ namespace Chip.Contrl
                 // model is A8200 (2U8)
                 Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200;
                 I2connection.NumOfHDSlots = 8;
+                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200");
             }
             else if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3120, 0xF4, 1, ref data_temp) == 0)
             {
                 // model is A8100 (1U4)
                 Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8100;
                 I2connection.NumOfHDSlots = 4;
+                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8100");
             }
             else
             {
                 // model is A8020 (Tower) 
                 Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8020;
                 I2connection.NumOfHDSlots = 2;
+                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8020");
             }
 
         }

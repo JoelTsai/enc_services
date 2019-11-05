@@ -511,6 +511,7 @@ namespace Enclsoure
                 {
                     //FAN MAX
                     Console.WriteLine("FAN MAX.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX. Temp["+i+"]="+ outdata.all_temperatures[i]);
                     //AUTO_FAN(0xF| fanID);
                     Fan_control_flag |= FAN_Max;
                 }
@@ -521,6 +522,7 @@ namespace Enclsoure
                 {
                     //fan increase
                     Console.WriteLine("FAN increase.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.Temp[" + i + "]=" + outdata.all_temperatures[i]);
                     Fan_control_flag |= FAN_Increase;
                     //AUTO_FAN(0x1| fanID);
                 }
@@ -536,6 +538,7 @@ namespace Enclsoure
                 {
                     //if Fan to standard mode then Cur_stat ~ UW;
                     Console.WriteLine("FAN decrease.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.Temp[" + i + "]=" + outdata.all_temperatures[i]);
                     //AUTO_FAN(0x2| fanID);
                     Fan_control_flag |= FAN_Decrease;
                     if (FAN_LEVEL == 0x03)
@@ -741,6 +744,7 @@ namespace Enclsoure
                 if (Fan_error == 0)
                 {
                     Console.WriteLine("Fan_error=0");
+                    Prom_Enclosure_Serives.Log_File.FileLog("Fan_error=0");
                     TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_GREEN);
                     if (GlobeError_LED_trigger == false)
                     { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
@@ -749,6 +753,7 @@ namespace Enclsoure
                 else if (Fan_error == 1)
                 {
                     Console.WriteLine("Fan_error=1");
+                    Prom_Enclosure_Serives.Log_File.FileLog("Fan_error=1");
                     TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_AMBER);
                     if (GlobeError_LED_trigger == false)
                     { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
@@ -757,6 +762,7 @@ namespace Enclsoure
                 else if (Fan_error >= 2)
                 {
                     Console.WriteLine("Fan_error>2");
+                    Prom_Enclosure_Serives.Log_File.FileLog("Fan_error>2");
                     TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_RED);
                     if (GlobeError_LED_trigger == false)
                     { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_RED); }
@@ -891,6 +897,7 @@ namespace Enclsoure
                 {
                     //FAN MAX
                     Console.WriteLine("FAN MAX.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
                     Fan_control_flag |= FAN_Max;
                    // AUTO_FAN(0xF| FAN_MASK_SYS);
                    // break;
@@ -902,6 +909,7 @@ namespace Enclsoure
                 {
                     //fan increase
                     Console.WriteLine("FAN increase.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
                     Fan_control_flag |= FAN_Increase;
                     //AUTO_FAN(0x1| FAN_MASK_SYS);
                    // break;
@@ -918,6 +926,7 @@ namespace Enclsoure
                 {
                     //if Fan to standard mode then Cur_stat ~ UW;
                     Console.WriteLine("FAN decrease.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
                     Fan_control_flag |= FAN_Decrease;
                     //AUTO_FAN(0x2| FAN_MASK_SYS);
                     if (FAN_LEVEL == 0x02)
