@@ -60,8 +60,10 @@ namespace Prom_Enclosure_Serives
             try
             {
                 Registry_Watcher.Start();
-                Enclosure_update_timer = new System.Timers.Timer();
-                Enclosure_update_timer.Interval = Convert.ToInt32(TimeParameter) * 1000;
+                Enclosure_update_timer = new System.Timers.Timer
+                {
+                    Interval = Convert.ToInt32(TimeParameter) * 1000
+                };
                 Enclosure_update_timer.Elapsed += new ElapsedEventHandler(Enclosure_update);
                 Enclosure_update_timer.Start();
             }
