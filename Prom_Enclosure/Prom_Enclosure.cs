@@ -219,7 +219,7 @@ namespace Prom_Enclosure_Serives
                 if (softwareKey != null) softwareKey.Close();
                 if (localKey != null) localKey.Close();
             }
-
+#if false
             while (true)
             {
                 Console.WriteLine("psuNum:");
@@ -231,7 +231,7 @@ namespace Prom_Enclosure_Serives
 
                 Enclosure.PSU.PSUSetFanSpeed(psuNum,status);
             }
-
+#endif
 
             Blink_timer = new System.Timers.Timer
             {
@@ -892,6 +892,14 @@ namespace Prom_Enclosure_Serives
                                     key4Driver.SetValue(kv.Key, buffer.ToArray(), RegistryValueKind.Binary);
                                     break;
                                 case "Temperature":
+                                    writer.Write((UInt32)kv.Value.Length);
+                                    for (int i = 0; i < kv.Value.Length; i++)
+                                    {
+                                        writer.Write((UInt32)kv.Value[i]);
+                                    }
+                                    key4Driver.SetValue(kv.Key, buffer.ToArray(), RegistryValueKind.Binary);
+                                    break;
+                                case "PSU_Temperature":
                                     writer.Write((UInt32)kv.Value.Length);
                                     for (int i = 0; i < kv.Value.Length; i++)
                                     {

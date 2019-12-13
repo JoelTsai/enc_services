@@ -176,40 +176,45 @@ namespace Chip.Contrl
 
         }
 
-        public void Get_Temperature(uint tempNum, ref uint Temperature)//ref uint?[] Temperature)
+        public void Get_Temperature(ref uint?[] Temperature)//ref uint?[] Temperature)
         {
             uint status = 0, data = 0, addr = 0, offset = 0, bit = 0;
-            PSUPresentStatus(tempNum, ref status);
-            if (status == 0)
+            for (uint tempNum = 0; tempNum < Temperature.Length; tempNum++)
             {
-                Temperature = 0;
-                return;
-            }
+                PSUPresentStatus(tempNum, ref status);
 
-            switch (tempNum)
-            {
-                case PCH_Constants.PCH200_I2C_PSU_TEMP_SENSOR_0:
-                    addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
-                    offset = NCT7802_Constants.NCT7802Y_TEMP_RTD3_HIGH_REG;
-                    break;
+                if (status == 0)
+                {
+                    Temperature[tempNum] = 0;
+                    return;
+                }
 
-                case PCH_Constants.PCH200_I2C_PSU_TEMP_SENSOR_1:
-                    addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
-                    offset = NCT7802_Constants.NCT7802Y_TEMP_RTD2_HIGH_REG;
-                    break;
+                switch (tempNum)
+                {
+                    case PCH_Constants.PCH200_I2C_PSU_TEMP_SENSOR_0:
+                        addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
+                        offset = NCT7802_Constants.NCT7802Y_TEMP_RTD3_HIGH_REG;
+                        break;
 
-                default:
-                    Console.WriteLine("PCH200 PSU device number out of range.\n");
-                    break;
+                    case PCH_Constants.PCH200_I2C_PSU_TEMP_SENSOR_1:
+                        addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
+                        offset = NCT7802_Constants.NCT7802Y_TEMP_RTD2_HIGH_REG;
+                        break;
+
+                    default:
+                        Console.WriteLine("PCH200 PSU device number out of range.\n");
+                        break;
+                }
+                data = 0;
+                if (I2C_read_value(addr, offset, ref data) == -1)
+                {
+                    //*temperature = temperature_prev[tempNum];
+                    Console.WriteLine("PCH200 PSU I2C read fail.\n");
+                    return;
+                }
+                data += 3;    //For Fitting Real temperature
+                Temperature[tempNum] = data;
             }
-            data = 0;
-            if (I2C_read_value(addr, offset,ref data) == -1)
-            {
-                //*temperature = temperature_prev[tempNum];
-                Console.WriteLine("PCH200 PSU I2C read fail.\n");
-                return;
-            }
-            data += 3;    //For Fitting Real temperature
             return;
         }
 

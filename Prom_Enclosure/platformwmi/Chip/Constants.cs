@@ -429,5 +429,7 @@ namespace Chip.Contrl
 
         internal const uint ENC_A3340R_PSU_DEFAULT_FAN_SPEED = 0x54;
         internal const uint ENC_A3340R_PSU_FULL_FAN_SPEED = 0xFF;
+
+        internal const uint PSU_NUM = 0x2;
     }
 }

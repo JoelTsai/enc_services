@@ -57,6 +57,7 @@ namespace Enclsoure
         public uint?[] all_temperatures;
         public uint?[] all_fans;
         public uint?[] all_leds;
+        public uint?[] PSU_temperatures;
 
     };
 
@@ -151,7 +152,7 @@ namespace Enclsoure
         // public CPU CPU;
         public TCA6416 tca6416;
         All_senserdata outdata;
-        TEMPOBJ TempObj;
+        TEMPOBJ TempObj, PSU_temp;
         HDD_TEMPOBJ HDD_temp;
 
         private static readonly uint FAN_Default_LEVEL = 0x2;
@@ -176,6 +177,7 @@ namespace Enclsoure
         private uint?[,] SMB_fans = new uint?[0,0];
         private uint?[] TCA_leds = new uint?[0];
         private uint?[] CPU_temperatures = new uint?[0];
+        private uint?[] PSU_temperatures = new uint?[0];
 
         private uint FAN_MASK_CPU = 0x0100;
         private uint FAN_MASK_SYS = 0x0200;
@@ -265,6 +267,7 @@ namespace Enclsoure
             NCT_voltages = new uint?[4];
             NCT_temperatures = new uint?[NCT677X.SIO_TEM_NUM];
             CPU_temperatures = new uint?[1];
+            PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
             TCA_leds = new uint?[2];
             
             NCT_fans = new uint?[NCT677X.SIO_FAN_NUM,2];
@@ -276,9 +279,12 @@ namespace Enclsoure
             outdata.all_voltages = new uint?[NCT_voltages.Length];
             outdata.all_temperatures = new uint?[NCT_temperatures.Length + CPU_temperatures.Length];
             outdata.all_leds = new uint?[TCA_leds.Length];
+            outdata.PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
 
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
+            PSU_temp = new TEMPOBJ(Convert.ToInt32(PSU_Constants.PSU_NUM));
+
             Console.WriteLine("!!NumOfHDSlots = 0x{0:x} ", I2connection.NumOfHDSlots);
             PD_OC_blink_thread = new Thread(PD_OC_Blink);
         }
@@ -327,6 +333,7 @@ namespace Enclsoure
             sensorData.Add("Temperature", outdata.all_temperatures);
             sensorData.Add("Fan", outdata.all_fans);
             sensorData.Add("Voltage", outdata.all_voltages);
+            sensorData.Add("PSU_Temperature", outdata.PSU_temperatures);
             //sensorData.Add("Led", outdata.all_leds);
             //
 
@@ -390,6 +397,15 @@ namespace Enclsoure
             NCT.Get_Temperature(ref NCT_temperatures);
             Array.Copy(NCT_temperatures, 0, outdata.all_temperatures, CPU_temperatures.Length, NCT_temperatures.Length);
 
+            PSU.Get_Temperature(ref PSU_temperatures);
+            Array.Copy(PSU_temperatures, outdata.PSU_temperatures, PSU_temperatures.Length);
+
+            /* for(int i=0;i<PSU_temperatures.Length;i++)
+             {
+
+                 Console.WriteLine("<<<<<<PSU {0} temp={1}", i, PSU_temperatures[i]);
+             }
+             Console.ReadLine();*/
         }
 
         public void Thermal_Management()
