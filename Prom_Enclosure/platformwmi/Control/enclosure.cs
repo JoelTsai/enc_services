@@ -58,7 +58,7 @@ namespace Enclsoure
         public uint?[] all_fans;
         public uint?[] all_leds;
         public uint?[] PSU_temperatures;
-
+        public uint?[] PSU_fans;
     };
 
     internal struct TEMPOBJ
@@ -178,6 +178,7 @@ namespace Enclsoure
         private uint?[] TCA_leds = new uint?[0];
         private uint?[] CPU_temperatures = new uint?[0];
         private uint?[] PSU_temperatures = new uint?[0];
+        private uint?[,] PSU_fans = new uint?[0, 0];
 
         private uint FAN_MASK_CPU = 0x0100;
         private uint FAN_MASK_SYS = 0x0200;
@@ -267,7 +268,6 @@ namespace Enclsoure
             NCT_voltages = new uint?[4];
             NCT_temperatures = new uint?[NCT677X.SIO_TEM_NUM];
             CPU_temperatures = new uint?[1];
-            PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
             TCA_leds = new uint?[2];
             
             NCT_fans = new uint?[NCT677X.SIO_FAN_NUM,2];
@@ -275,11 +275,16 @@ namespace Enclsoure
             {
                 SMB_fans = new uint?[2,2];
             }
+            PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
+            PSU_fans = new uint?[PSU_Constants.PSU_NUM, 2];
+
             outdata.all_fans = new uint?[(NCT_fans.Length+SMB_fans.Length)/2];
             outdata.all_voltages = new uint?[NCT_voltages.Length];
             outdata.all_temperatures = new uint?[NCT_temperatures.Length + CPU_temperatures.Length];
             outdata.all_leds = new uint?[TCA_leds.Length];
             outdata.PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
+            outdata.PSU_fans = new uint?[PSU_Constants.PSU_NUM];
+
 
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
@@ -334,6 +339,7 @@ namespace Enclsoure
             sensorData.Add("Fan", outdata.all_fans);
             sensorData.Add("Voltage", outdata.all_voltages);
             sensorData.Add("PSU_Temperature", outdata.PSU_temperatures);
+            sensorData.Add("PSU_Fan", outdata.PSU_fans);
             //sensorData.Add("Led", outdata.all_leds);
             //
 
@@ -346,6 +352,7 @@ namespace Enclsoure
         {
             int NTC_array_length = NCT_fans.Length / NCT_fans.Rank;
             int SMB_array_length = SMB_fans.Length / SMB_fans.Rank;
+            int PSU_array_length = PSU_fans.Length / PSU_fans.Rank;
             NCT.Get_Fan(ref NCT_fans);
 
             //Array.Copy(NCT_fans, outdata.all_fans, NCT_fans.Length);
@@ -367,7 +374,13 @@ namespace Enclsoure
                     outdata.all_fans[i] = (SMB_fans[i - NTC_array_length, 1] << 24) | SMB_fans[i - NTC_array_length, 0];
                 }
             }
-
+            PSU.GetPSUFanSpeed(ref PSU_fans);
+            for (int i = 0; i < PSU_array_length; i++)
+            {
+                // Console.WriteLine(" NCT_fans[{1}, 1] = 0x{0:x} ", NCT_fans[i, 1], i);
+                // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
+                outdata.PSU_fans[i] = (PSU_fans[i, 1] << 24) | PSU_fans[i, 0];
+            }
 
             //sensorData.Add("Fan", outdata.all_fans);
 

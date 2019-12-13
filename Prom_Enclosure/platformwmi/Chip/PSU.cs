@@ -258,53 +258,60 @@ namespace Chip.Contrl
             }
 
         }
-        public void GetPSUFanSpeed(uint fanNum, ref uint fanSpeed)
+        public void GetPSUFanSpeed(ref uint?[,] Fan)
         {
-            uint data = 0, addr = 0, offset = 0, hdata = 0, ldata = 0, temp_data = 0;
-
-            switch (fanNum)
+            uint fanSpeed = 0, addr = 0, offset = 0, hdata = 0, ldata = 0, temp_data = 0, fanNum=0;
+            for (fanNum = 0; fanNum < PSU_Constants.PSU_NUM; fanNum++)
             {
-                case PCH_Constants.PCH200_I2C_DEV_PSU_0:
-                    addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
-                    offset = NCT7802_Constants.NCT7802Y_FAN_IN2_COUNT_REG;
+                switch (fanNum)
+                {
+                    case PCH_Constants.PCH200_I2C_DEV_PSU_0:
+                        addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
+                        offset = NCT7802_Constants.NCT7802Y_FAN_IN2_COUNT_REG;
+                        break;
+                    case PCH_Constants.PCH200_I2C_DEV_PSU_1:
+                        addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
+                        offset = NCT7802_Constants.NCT7802Y_FAN_IN1_COUNT_REG;
+                        break;
+
+                    default:
+                        Console.WriteLine("PCH200 PSU fan number out of range.\n");
+                        break;
+                }
+
+
+                /* Get fan speed from PSU */
+                hdata = 0;
+                if (I2C_read_value(addr, offset, ref hdata) == -1)
+                {
+                    //*fanSpeed = speed_prev[fanNum];
+                    Console.WriteLine("PCH200 PSU I2C read fail.\n");
+                    return;
+                }
+
+                ldata = 0;
+                offset = NCT7802_Constants.NCT7802Y_FAN_LOW_COUNT_REG;
+                if (I2C_read_value(addr, offset, ref ldata) == -1)
+                {
+                    // *fanSpeed = speed_prev[fanNum];
+                    Console.WriteLine("PCH200 PSU I2C read fail.\n");
+                    return;
+                }
+
+                if ((hdata == 0xFF) && (ldata == 0xF8))
+                {
+                    fanSpeed = 0;
+                    Fan[fanNum, 0] = Convert.ToUInt32(fanSpeed);
+                    Fan[fanNum, 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
                     break;
-                case PCH_Constants.PCH200_I2C_DEV_PSU_1:
-                    addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_2;
-                    offset = NCT7802_Constants.NCT7802Y_FAN_IN1_COUNT_REG;
-                    break;
-
-                default:
-                    Console.WriteLine("PCH200 PSU fan number out of range.\n");
-                    break;
-            }
-
-
-            /* Get fan speed from PSU */
-            hdata = 0;
-            if (I2C_read_value(addr, offset,ref hdata) == -1)
-            {
-                //*fanSpeed = speed_prev[fanNum];
-                Console.WriteLine("PCH200 PSU I2C read fail.\n");
-                return;
-            }
-
-            ldata = 0;
-            offset = NCT7802_Constants.NCT7802Y_FAN_LOW_COUNT_REG;
-            if (I2C_read_value(addr, offset,ref ldata) == -1)
-            {
-               // *fanSpeed = speed_prev[fanNum];
-                Console.WriteLine("PCH200 PSU I2C read fail.\n");
-                return;
-            }
-
-            if ((hdata == 0xFF) && (ldata == 0xF8))
-            {
-                fanSpeed = 0;
-            }
-            else
-            {
-                temp_data = ((hdata << 5) | (ldata >> 3));
-                fanSpeed = (temp_data >> 4);             
+                }
+                else
+                {
+                    temp_data = ((hdata << 5) | (ldata >> 3));
+                    fanSpeed = (temp_data >> 4);
+                }
+                Fan[fanNum, 0] = Convert.ToUInt32(fanSpeed);
+                Fan[fanNum, 1] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
             }
             return;
         }
