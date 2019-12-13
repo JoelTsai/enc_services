@@ -14,79 +14,6 @@ using WingRing;
 
 namespace Chip.Contrl
 {
-
-    static class NCT5567_Constants
-    {
-
-        internal const uint NCT5567_ENV_CTRL_FAN_SEN_CPUTIN = 0;
-        internal const uint NCT5567_ENV_CTRL_FAN_SEN_SYSTIN = 1;
-        internal const uint NCT5567_ENV_CTRL_FAN_SEN_AUXTIN = 2;
-        internal const uint NCT5567_ENV_CTRL_FAN_ALL = 0xFF;
-
-        internal const uint NCT5567_ENV_FAN_CONFIG_SYSFAN_REG = 0x004;
-        internal const uint NCT5567_ENV_FAN_CONFIG_FAN_PWM = 0x000;
-        internal const uint NCT5567_ENV_FAN_MODE_SYSFAN_REG = 0x102;
-        internal const uint NCT5567_ENV_FAN_MODE_CPUFAN_REG = 0x202;
-        internal const uint NCT5567_ENV_FAN_MODE_AUXFAN_REG = 0x302;
-        internal const uint NCT5567_ENV_FAN_MODE_AUXFAN2_REG = 0x902;
-        internal const uint NCT5567_ENV_FAN_MODE_FAN_MANUAL_MODE = 0x000;
-        internal const ushort NCT5567_ENV_FAN_SET_SYSFAN_REG = 0x109;
-        internal const ushort NCT5567_ENV_FAN_SET_CPUFAN_REG = 0x209;
-        internal const ushort NCT5567_ENV_FAN_SET_AUXFAN_REG = 0x309;
-        internal const ushort NCT5567_ENV_FAN_SET_AUXFAN2_REG = 0x909;
-        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_VAL_H_REG = 0x4C0;
-        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_VAL_L_REG = 0x4C1;
-        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_VAL_H_REG = 0x4C2;
-        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_VAL_L_REG = 0x4C3;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_VAL_H_REG = 0x4C4;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_VAL_L_REG = 0x4C5;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN2_VAL_H_REG = 0x4C8;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN2_VAL_L_REG = 0x4C9;
-        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_COUNT_H_REG = 0x4B0;
-        internal const ushort NCT5567_ENV_FAN_GET_SYSFAN_COUNT_L_REG = 0x4B1;
-        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_COUNT_H_REG = 0x4B2;
-        internal const ushort NCT5567_ENV_FAN_GET_CPUFAN_COUNT_L_REG = 0x4B3;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_COUNT_H_REG = 0x4B4;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN_COUNT_L_REG = 0x4B5;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN2_COUNT_H_REG = 0x4B8;
-        internal const ushort NCT5567_ENV_FAN_GET_AUXFAN2_COUNT_L_REG = 0x4B9;
-
-        internal const uint NCT5567_ENV_VOLT_CONFIG_VBAT_ENABLE = 0x01;
-        internal const uint NCT5567_ENV_VOLT_CONFIG_VBAT_REG = 0x05D;
-
-        /* Need to check
-         * internal const uint NCT5567_ENV_VOLT_CPUCORE_REG = 0x480;
-        internal const uint Nct6776_ENV_VOLT_12V_REG = 0x021;
-        internal const uint Nct6776_ENV_VOLT_AVCC_REG = 0x022;
-        internal const uint Nct6776_ENV_VOLT_3VCC_REG = 0x023;
-        internal const uint Nct6776_ENV_VOLT_VIN1_REG = 0x024;
-        internal const uint Nct6776_ENV_VOLT_5V_REG = 0x025;
-        internal const uint Nct6776_ENV_VOLT_VIN3_REG = 0x026;
-        */
-        internal const uint NCT5567_ENV_VOLT_3VSB_REG = 0x487;
-        internal const uint NCT5567_ENV_VOLT_VBAT_REG = 0x488;
-
-        internal const byte NCT5567_DEV = 0x07;
-
-        internal const uint NCT6XXX_PARALLEL_PORT_LDN = 0x01;
-        internal const uint NCT6XXX_UART_A_LDN = 0x02;
-        internal const uint NCT6XXX_UART_B_LDN = 0x03;
-        internal const uint NCT6XXX_GPIO_LDN = 0x07;
-        internal const uint NCT6XXX_PME_LDN = 0x04;
-        internal const uint NCT6XXX_HW_MONITOR_LDN = 0x0B;
-        internal const uint NCT6XXX_GPIO_WDT1_LDN = 0x08;
-        internal const uint NCT6XXX_PARALLEL_VID_LDN = 0x0D;
-
-        internal const uint NCT5567_ENV_CTRL_BASE_ADDR_REG = 0x60;
-
-        internal static readonly uint[] FAN_Level = { 0x4A, 0x4F, 0x5A, 0x5F, 0x6A, 0x6F, 0x7A, 0x7F, 0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFF };
-
-
-        internal const byte CHIP_ID_REGISTER = 0x20;
-        internal const byte CHIP_REVISION_REGISTER = 0x21;
-        internal const byte BASE_ADDRESS_REGISTER = 0x60;
-    }
-
     public class NCT677X 
     {
     	private uint port;
@@ -460,7 +387,7 @@ namespace Chip.Contrl
             for (int i = 0; i < voltages.Length; i++)
             {
                 byte data = ReadByte(voltageRegisters[i]);
-                int Temp = 0;
+                long Temp = 0;
                 switch (LPCIO_ID)
                 {
                     case 0xD121:
@@ -477,6 +404,7 @@ namespace Chip.Contrl
                                     break;
                                 case VoltageType.VOLTAGE_TYPE_3_3V:
                                     Temp = data * 8 * (34 + 34) / 34;
+                                Temp = data * 8 * (NCT5567_Constants.SIO_R1_3VCC + NCT5567_Constants.SIO_R2_3VCCE) / NCT5567_Constants.SIO_R2_3VCCE;
                                     break;
                             }
                         voltages[i] = Convert.ToUInt32(((Temp / 1000) << 4) + ((Temp / 100) % 10));

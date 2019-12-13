@@ -74,6 +74,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="platformwmi\Chip\PSU.cs" />
+    <Compile Include="platformwmi\Chip\Constants.cs" />
     <Compile Include="platformwmi\Chip\LPCIO.cs" />
     <Compile Include="Prom_Enclosure.cs">
       <SubType>Component</SubType>

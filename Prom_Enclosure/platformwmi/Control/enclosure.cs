@@ -146,8 +146,9 @@ namespace Enclsoure
         private Dictionary<string, uint?[]> sensorData;
 
         public NCT677X NCT;
-        public NCT7802 NCT7802;
-       // public CPU CPU;
+        public NCT7802 NCT7802_BP;
+        public PSU PSU;
+        // public CPU CPU;
         public TCA6416 tca6416;
         All_senserdata outdata;
         TEMPOBJ TempObj;
@@ -159,7 +160,9 @@ namespace Enclsoure
         //private static readonly uint FAN_offset = 0x03;//this offset is the level different of SYS_FAN and CPU_FAN
         //public uint Temp_OC_threshold = 100;
         // public uint Temp_OW_threshold = 80;
+        public const ushort Series_VA8200 = 0x09A0;
         public const ushort Model_VA8200 = 0x09A0;
+        public const ushort Model_VA8200D = 0x9B0;
         public const ushort Model_VA8100 = 0x09A1;
         public const ushort Model_VA8020 = 0x09A2;
 
@@ -217,7 +220,12 @@ namespace Enclsoure
 
                 if (Model_ID != Model_VA8020)
                 {
-                    NCT7802 = new NCT7802();
+                    NCT7802_BP = new NCT7802();
+                    NCT7802_BP.Chip_init(NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR);
+                    if (Model_ID == Model_VA8200D)//TBD how to detect model with daul power?
+                    {
+                        PSU = new PSU();
+                    }
                 }
                 //CPU = new CPU();
                 tca6416 = new TCA6416();
@@ -245,7 +253,7 @@ namespace Enclsoure
             NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_ALL, FAN_LEVEL);
             if (Model_ID != Model_VA8020)
             {
-                NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
+                NCT7802_BP.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
             }
         }
 
@@ -342,8 +350,8 @@ namespace Enclsoure
             }
             if (Model_ID != Model_VA8020 && Model_ID != 0xFFFF)
             {
-                NCT7802.Nct7802y_get_fan_speed(0x01, ref SMB_fans);
-                NCT7802.Nct7802y_get_fan_speed(0x02, ref SMB_fans);
+                NCT7802_BP.Nct7802y_get_fan_speed(0x01, ref SMB_fans);
+                NCT7802_BP.Nct7802y_get_fan_speed(0x02, ref SMB_fans);
                 // Array.Copy(SMB_fans, 0, outdata.all_fans, NCT_fans.Length, SMB_fans.Length);
                 for (int i = NTC_array_length; i < SMB_array_length + NTC_array_length; i++)
                 {
@@ -647,7 +655,7 @@ namespace Enclsoure
                     NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, 0xf);
                     if (Model_ID != Model_VA8020)
                     {
-                        NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, 0xf);
+                        NCT7802_BP.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, 0xf);
                     }
                     else
                     {
@@ -666,7 +674,7 @@ namespace Enclsoure
                         NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
                         if (Model_ID != Model_VA8020)
                         {
-                            NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
+                            NCT7802_BP.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
                         }
                         else
                         {
@@ -688,7 +696,7 @@ namespace Enclsoure
                         NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
                         if (Model_ID != Model_VA8020)
                         {
-                            NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
+                            NCT7802_BP.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, FAN_LEVEL);
                         }
                         else
                         {
@@ -750,7 +758,7 @@ namespace Enclsoure
                 if (Model_ID != Model_VA8020)
                 {
                     if (SYS_SET_FAN != 0)
-                        NCT7802.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, SYS_SET_FAN);
+                        NCT7802_BP.Nct7802y_set_fan_speed(NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN_ALL, SYS_SET_FAN);
                 }
                 else
                 {

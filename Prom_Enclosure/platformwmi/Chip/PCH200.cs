@@ -18,58 +18,6 @@ using i2api;
 
 namespace Chip.Contrl
 {
-
-	static class PCH_Constants
-	{
-
-        internal const uint PCH_QUICK          =0x00;
-        internal const uint PCH_BYTE           =0x04;
-        internal const uint PCH_BYTE_DATA      =0x08;
-        internal const uint PCH_WORD_DATA      =0x0C;
-        internal const uint PCH_PROC_CALL      =0x10;
-        internal const uint PCH_BLOCK_DATA     =0x14;
-        internal const uint PCH_I2C_BLOCK_DATA =0x18;
-        internal const uint PCH_BLOCK_LAST     =0x34;
-        internal const uint PCH_I2C_BLOCK_LAST =0x38;
-        internal const uint PCH_START          =0x40;
-        internal const uint PCH_PEC_EN         =0x80;
-
-        internal const uint PCH_SMBUS_ENABLE   =0x01;
-        internal const uint PCH_SMBUS_SMI_EN   =0x02;
-        internal const uint PCH_SMBUS_SSRESET  =0x08;
-
-        internal const uint SMBHSTSTS_BYTE_DONE       = 0x80;
-        internal const uint SMBHSTSTS_INUSE_STS       = 0x40;
-        internal const uint SMBHSTSTS_SMBALERT_STS    = 0x20;
-        internal const uint SMBHSTSTS_FAILED          = 0x10;
-        internal const uint SMBHSTSTS_BUS_ERR         = 0x08;
-        internal const uint SMBHSTSTS_DEV_ERR         = 0x04;
-        internal const uint SMBHSTSTS_INTR            = 0x02;
-        internal const uint SMBHSTSTS_HOST_BUSY       = 0x01;
-
-        internal const uint I2C_SMBUS_READ            =1;
-        internal const uint I2C_SMBUS_WRITE           =0;
-        internal const uint I2C_ERROR_LIMIT           =3;
-
-        internal const uint PCH200_LPC_DEVICE_NUMBER        			=	0x1f;
-        internal const uint PCH200_LPC_FUNCTION_NUMBER                =   0x00;
-        internal const uint PCH200_SMBUS_FUNCTION_NUMBER_SKYLAKE    	=	0x04;
-        internal const uint PCH200_SMB_BASE                 			=	0x20;
-
-        internal const uint PCH200_SMB_HOSTC = 0x40;
-
-
-        internal const uint MAX_TIMEOUT        = 100;
-        internal const uint MAX_INUSED_TIMEOUT = 200;
-        internal const uint MAX_BUSY_TIMEOUT   = 100;
-
-
-        internal const uint PCH200_I2C_BP_DEV_ADDR_VA3120 = 0x51;
-        internal const uint PCH200_I2C_BP_DEV_ADDR_VA3340 = 0x55;
-        internal const uint PCH200_I2C_BP_DEV_ADDR_VA8020 = 0x57;
-
-    }
-
     public static class PCHSMBUS
     {
        private static uint SMBHSTSTS = 0;
@@ -122,9 +70,25 @@ namespace Chip.Contrl
 
                     if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
                     {
-                        I2connection.NumOfHDSlots = 8;
-                        Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200");
-                        Model_check_result = true;
+                        if (!(ReadSMB(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, 0x00, 1, ref data_temp) == 0))
+                        {
+                            I2connection.NumOfHDSlots = 8;
+                            Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200");
+                            Model_check_result = true;
+                        }
+
+                    }
+                    break;
+                case Enclsoure.Enclsoure_class.Model_VA8200D:
+                    if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
+                    {
+                        if (ReadSMB(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, 0x00, 1, ref data_temp) == 0)
+                        {
+                            I2connection.NumOfHDSlots = 8;
+                            Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200");
+                            Model_check_result = true;
+                        }
+                            
                     }
                     break;
                 case Enclsoure.Enclsoure_class.Model_VA8100:
@@ -155,10 +119,18 @@ namespace Chip.Contrl
                 
                 if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
                 {
-                    // model is A8200 (2U8)
-                    Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200;
-                    I2connection.NumOfHDSlots = 8;
-                    Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200");
+                    if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
+                    {
+                        Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200D;
+                        I2connection.NumOfHDSlots = 8;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200D");
+                    }
+                    else {
+                        // model is A8200 (2U8)
+                        Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200;
+                        I2connection.NumOfHDSlots = 8;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200");
+                    }
                 }
                 else if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3120, 0xF4, 1, ref data_temp) == 0)
                 {

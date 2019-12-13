@@ -13,13 +13,6 @@ using WingRing;
 
 namespace Chip.Contrl
 {
-    static class CPU_IA32_Constants
-    {
-        internal const uint IA32_THERM_STATUS = 0x19C;
-        internal const uint MSR_TEMPERATURE_TARGET = 0x1A2;
-    }
-
-
     public class CPU
     {
         /*follow PCI spec define smbus device and funtion*/    
