@@ -39,7 +39,7 @@ namespace Chip.Contrl
                 }
                try
                 {
-                  for (int i = 0; i < HDDinfo.Length; i++)
+                for (int i = 0; i < HDDinfo.Length; i++)
                    {
                     int slotid = Convert.ToInt32(HDDinfo[i].PDId);
                   // Console.WriteLine("slotid={0}", slotid);
@@ -48,10 +48,10 @@ namespace Chip.Contrl
 
                     HDD_TEMP[slotid - 1] = Convert.ToUInt16(HDDinfo[i].temperature);
 
-                  //  Console.WriteLine("NumOfPD[{1}]={0}", HDDinfo[i].NumOfPD, i);
-                   // Console.WriteLine("PDId[{1}]={0}", HDDinfo[i].PDId, i);
-                  //  Console.WriteLine("confCapacity[{1}]={0}", HDDinfo[i].confCapacity, i);
-                  //  Console.WriteLine("temperature[{1}]={0}", Convert.ToUInt16(HDDinfo[i].temperature), i);
+                    //Console.WriteLine("NumOfPD[{1}]={0}", HDDinfo[i].NumOfPD, i);
+                    //Console.WriteLine("PDId[{1}]={0}", HDDinfo[i].PDId, i);
+                    //Console.WriteLine("confCapacity[{1}]={0}", HDDinfo[i].confCapacity, i);
+                    //Console.WriteLine("temperature[{1}]={0}", Convert.ToUInt16(HDDinfo[i].temperature), i);
 
                   }
                 }

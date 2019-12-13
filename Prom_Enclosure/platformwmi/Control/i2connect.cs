@@ -31,6 +31,7 @@ namespace i2api
         //Classes
         internal const uint EVT_CLASS_COOLING_DEVICE = 0x0005;
         internal const uint EVT_CLASS_TEMPERATURE    = 0x001e;
+        internal const uint EVT_CLASS_PHYSICAL_DISK = 0x000d;
 
         /* EVT_CLASS_COOLING_DEVICE             0x05 */
         internal const uint EVT_CODE_COOLING_DEVICE_STARTED = 0x00;
@@ -55,6 +56,13 @@ namespace i2api
         internal const uint EVT_CODE_CTRL_TEMP_RETURNED_TO_NORMAL = 0x06;       /* for V4 group */
         internal const uint EVT_CODE_TEMP_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU = 0x07;
         /* EVT_CLASS_TEMPERATURE                0x1e */
+
+        /* EVT_CLASS_PHYSICAL_DISK              0x0d */
+        internal const uint EVT_CODE_PD_TEMP_OVER = 0x39;
+        internal const uint EVT_CODE_PD_TEMP_RETURNED_TO_NORMAL = 0x3A;
+        internal const uint EVT_CODE_PD_HI_CRITICAL_TEMP_OVER = 0x3B;
+        internal const uint EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU = 0x3D;  
+        /* EVT_CLASS_PHYSICAL_DISK              0x0d */
 
     }
 
@@ -121,25 +129,26 @@ namespace i2api
                 HDDinfo = new pMicHddInfo_t[workStationCount];
 
 
-               // Console.WriteLine("===================tyrtyrty=====v1.4");
+                //Console.WriteLine("===================tyrtyrty=====v1.4");
                 status = PhysicalDriveInfo(HDDinfoIntptr, size * NumOfHDSlots, NumOfHDSlots);
                 //Console.WriteLine("PhysicalDriveInfo__status={0}", status);
                 for (int i = 0; i < workStationCount; i++)
                 {
-                    IntPtr ptr = (IntPtr)((UInt32)HDDinfoIntptr + i * size);
+                    IntPtr ptr = (IntPtr)(HDDinfoIntptr + i * size);
                     HDDinfo[i] = (pMicHddInfo_t)Marshal.PtrToStructure(ptr, typeof(pMicHddInfo_t));
                 }
-
-                /*for(int i=0;i<HDDinfo.Length;i++)
+                /*Console.WriteLine("HDDinfo.Length={0}", HDDinfo.Length);
+                for (int i=0;i<HDDinfo.Length;i++)
                 {
                     Console.WriteLine("HDDinfo[{0}].temperature={1}", i, Convert.ToInt32(HDDinfo[i].temperature));
                 }*/
                 Marshal.FreeHGlobal(HDDinfoIntptr);
 
             }
-            catch(OverflowException)
+            catch(OverflowException ex)
             {
-
+                Console.WriteLine("OverflowException FAIL={0}", ex);
+                Prom_Enclosure_Serives.Log_File.FileLog("GetHardDiskDriveInfo_FAIL:" + Convert.ToString(ex));
             }
             catch (Exception ex)
             {

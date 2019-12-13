@@ -61,12 +61,13 @@ namespace Chip.Contrl
 
         internal const uint MAX_TIMEOUT        = 100;
         internal const uint MAX_INUSED_TIMEOUT = 200;
-        internal const uint MAX_BUSY_TIMEOUT   = 200;
+        internal const uint MAX_BUSY_TIMEOUT   = 100;
 
 
         internal const uint PCH200_I2C_BP_DEV_ADDR_VA3120 = 0x51;
         internal const uint PCH200_I2C_BP_DEV_ADDR_VA3340 = 0x55;
-       
+        internal const uint PCH200_I2C_BP_DEV_ADDR_VA8020 = 0x57;
+
     }
 
     public static class PCHSMBUS
@@ -105,29 +106,75 @@ namespace Chip.Contrl
 			SMBPEC     = 8  + SMBusbase;
 			SMBAUXSTS  = 12 + SMBusbase;
 			SMBAUXCTL  = 13 + SMBusbase;
+
+
+            Model_check();
+
+        }
+
+        private static void Model_check()
+        {
             uint[] data_temp = new uint[1];
-            if(ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1,ref data_temp)==0)
+            bool Model_check_result = false;
+            switch (Enclsoure.Enclsoure_class.Model_ID)
             {
-                // model is A8200 (2U8)
-                Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200;
-                I2connection.NumOfHDSlots = 8;
-                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200");
-            }
-            else if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3120, 0xF4, 1, ref data_temp) == 0)
-            {
-                // model is A8100 (1U4)
-                Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8100;
-                I2connection.NumOfHDSlots = 4;
-                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8100");
-            }
-            else
-            {
-                // model is A8020 (Tower) 
-                Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8020;
-                I2connection.NumOfHDSlots = 2;
-                Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8020");
+                case Enclsoure.Enclsoure_class.Model_VA8200:
+
+                    if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
+                    {
+                        I2connection.NumOfHDSlots = 8;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200");
+                        Model_check_result = true;
+                    }
+                    break;
+                case Enclsoure.Enclsoure_class.Model_VA8100:
+
+                    if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3120, 0xF4, 1, ref data_temp) == 0)
+                    {
+                        I2connection.NumOfHDSlots = 4;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8100");
+                        Model_check_result = true;
+                    }
+                    break;
+                case Enclsoure.Enclsoure_class.Model_VA8020:
+
+                    if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA8020, 0xF4, 1, ref data_temp) == 0)
+                    {
+                        I2connection.NumOfHDSlots = 2;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8020");
+                        Model_check_result = true;
+                    }
+                    break;
+                default:
+                    break;
+
             }
 
+            if (Model_check_result == false)
+            {
+                
+                if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3340, 0xF4, 1, ref data_temp) == 0)
+                {
+                    // model is A8200 (2U8)
+                    Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8200;
+                    I2connection.NumOfHDSlots = 8;
+                    Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8200");
+                }
+                else if (ReadSMB(PCH_Constants.PCH200_I2C_BP_DEV_ADDR_VA3120, 0xF4, 1, ref data_temp) == 0)
+                {
+                    // model is A8100 (1U4)
+                    Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8100;
+                    I2connection.NumOfHDSlots = 4;
+                    Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8100");
+                }
+                else
+                {
+                    // model is A8020 (Tower) 
+                    Enclsoure.Enclsoure_class.Model_ID = Enclsoure.Enclsoure_class.Model_VA8020;
+                    I2connection.NumOfHDSlots = 2;
+                    Prom_Enclosure_Serives.Log_File.FileLog("Model_ID=A8020");
+                }
+            }
         }
 
         public static byte ReadIOSp(uint address, uint offset)
@@ -304,7 +351,7 @@ namespace Chip.Contrl
                 if ((hst_sts & PCH_Constants.SMBHSTSTS_HOST_BUSY) == PCH_Constants.SMBHSTSTS_HOST_BUSY)
                 {
                     timeout++;
-                    Thread.Sleep(5);
+                    Thread.Sleep(3);
                     if (timeout == PCH_Constants.MAX_BUSY_TIMEOUT)
                     {
                         /* SMBus Kill Command */

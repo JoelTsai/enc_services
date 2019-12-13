@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using OpenLibSys;
 using WingRing;
 using i2api;
+using System.Timers;
 
 namespace Enclsoure
 {
@@ -42,6 +43,11 @@ namespace Enclsoure
         internal const uint FAN_MALFUNCTIONING = 1;
         internal const uint FAN_NOT_INSTALLED = 2;
         internal const uint FAN_STS_UNKNOWN = 0x80;
+
+        internal const uint Temp_OW_threshold_default = 90;
+        internal const uint Temp_OC_threshold_default = 100;
+        internal const uint HDD_OW_threshold_default = 55;
+        internal const uint HDD_OC_threshold_default = 65;
     }
 
 
@@ -63,6 +69,7 @@ namespace Enclsoure
 
         public uint?[] prev_stat;
         public uint?[] cur_stat;
+        internal DateTime[] Controller_OC_time;
 
         public TEMPOBJ(int Length)
         {
@@ -72,14 +79,15 @@ namespace Enclsoure
             prev_temp = new uint?[Length];
             cur_stat = new uint?[Length];
             prev_stat = new uint?[Length];
-
+            Controller_OC_time = new DateTime[Length];
             for (int i = 0; i < Length; i++)
             {
                 prev_temp[i] = Enclsoure_Constants.ENC_TEMP_INVALID_VALUE;
                 cur_stat[i] = 0;
                 prev_stat[i] = 0;
-                Temp_OC_threshold[i] = 50;
-                Temp_OW_threshold[i] = 43;
+                Temp_OC_threshold[i] = Enclsoure_Constants.Temp_OC_threshold_default;
+                Temp_OW_threshold[i] = Enclsoure_Constants.Temp_OW_threshold_default;
+                Controller_OC_time[i] = DateTime.Now;
                 hys_temp[i] = 4;
             }
         }
@@ -97,6 +105,7 @@ namespace Enclsoure
 
         public uint?[] prev_stat;
         public uint?[] cur_stat;
+        internal DateTime[] PD_OC_time;
 
         public HDD_TEMPOBJ(uint Length)
         {
@@ -107,15 +116,16 @@ namespace Enclsoure
             prev_temp = new uint?[Length];
             cur_stat = new uint?[Length];
             prev_stat = new uint?[Length];
-
+            PD_OC_time = new DateTime[Length];
             for (int i = 0; i < Length; i++)
             {
                 prev_temp[i] = 0xFF;
                 cur_temp[i] = 0xFF;
                 prev_stat[i] = 0;
                 cur_stat[i] = 0;
-                HDD_OC_threshold[i] = 65;
-                HDD_OW_threshold[i] = 55;
+                HDD_OC_threshold[i] = Enclsoure_Constants.HDD_OC_threshold_default;
+                HDD_OW_threshold[i] = Enclsoure_Constants.HDD_OW_threshold_default;
+                PD_OC_time[i] = DateTime.Now;
                 hys_temp[i] = 4;
             }
         }
@@ -137,19 +147,21 @@ namespace Enclsoure
 
         public NCT677X NCT;
         public NCT7802 NCT7802;
-        public CPU CPU;
-        public TCA6416 TCA6416;
+       // public CPU CPU;
+        public TCA6416 tca6416;
         All_senserdata outdata;
         TEMPOBJ TempObj;
         HDD_TEMPOBJ HDD_temp;
-        
-        private static uint FAN_LEVEL =  0x02 ;//init will set this level to fan
+
+        private static readonly uint FAN_Default_LEVEL = 0x2;
+        private static uint FAN_LEVEL = FAN_Default_LEVEL;//init will set this level to fan
+
         //private static readonly uint FAN_offset = 0x03;//this offset is the level different of SYS_FAN and CPU_FAN
         //public uint Temp_OC_threshold = 100;
-       // public uint Temp_OW_threshold = 80;
-        public readonly static ushort Model_VA8200 = 0x04;
-        public readonly static ushort Model_VA8100 = 0x02;
-        public readonly static ushort Model_VA8020 = 0x01;
+        // public uint Temp_OW_threshold = 80;
+        public const ushort Model_VA8200 = 0x09A0;
+        public const ushort Model_VA8100 = 0x09A1;
+        public const ushort Model_VA8020 = 0x09A2;
 
         public  static ushort Model_ID = 0;
 
@@ -170,29 +182,55 @@ namespace Enclsoure
         private const uint FAN_Increase = 0x0002;
         private const uint FAN_Max = 0x0004;
 
+        public static uint Temp_OW_threshold = Enclsoure_Constants.Temp_OW_threshold_default;
+        public static uint Temp_OC_threshold = Enclsoure_Constants.Temp_OC_threshold_default;
+        public static uint HDD_OW_threshold = Enclsoure_Constants.HDD_OW_threshold_default;
+        public static uint HDD_OC_threshold = Enclsoure_Constants.HDD_OC_threshold_default;
 
-        internal static short Fan_error = 0;
+
+        internal static ushort Fan_error = 0;
         private uint Fan_control_flag = 0;
         public static  uint Fan_color = TCA6416_Constants.ENC_LED_GREEN;
         public static uint GlobeError_color = TCA6416_Constants.ENC_LED_GREEN;
         internal static bool FAN_LED_trigger = false;
         internal static bool GlobeError_LED_trigger = false;
+        internal static bool Blink_trigger = false; 
         internal static uint NET_LED = 0;
         internal static uint OPAS_LED = 0;
+
+        static DateTime FAN_CHANGE_Time_offset;
+        private TimeSpan FAN_CHANGE_time_diff;
+
+
+        public static byte[,] Locatemask=new byte[2,2];
+        public static bool HDD_OC_blink = false;
+        public Thread PD_OC_blink_thread;
         public void Program()
         {
             PCHSMBUS.PCHSMBUS_init();
             NCT = new NCT677X();
-            if (Model_ID!= Model_VA8020)
-            {
-                NCT7802 = new NCT7802();
-            }
-            CPU = new CPU();
-            TCA6416 = new TCA6416();
+           // CPU = new CPU();
             sensorData = new Dictionary<string, uint?[]>();
+            if (Model_ID != 0xffff)
+            {
+                FAN_CHANGE_Time_offset = DateTime.Now.AddTicks(-3000000000);
 
-            FanInit();
+                if (Model_ID != Model_VA8020)
+                {
+                    NCT7802 = new NCT7802();
+                }
+                //CPU = new CPU();
+                tca6416 = new TCA6416();
 
+                FanInit();
+                for (int i = 0; i < Locatemask.Length / Locatemask.Rank; i++)
+                {
+                    for (int j = 0; j < Locatemask.Rank; j++)
+                    {
+                        Locatemask[i,j] = 0;
+                    }
+                }
+            }
 
         }
 
@@ -217,11 +255,12 @@ namespace Enclsoure
             Program();
            // Init();  //it will already init in Ring0.cs
             NCT_voltages = new uint?[4];
-            NCT_temperatures = new uint?[1];
+            NCT_temperatures = new uint?[NCT677X.SIO_TEM_NUM];
             CPU_temperatures = new uint?[1];
             TCA_leds = new uint?[2];
+            
             NCT_fans = new uint?[NCT677X.SIO_FAN_NUM,2];
-            if (Model_ID != Model_VA8020)
+            if (Model_ID != Model_VA8020 && Model_ID != 0xFFFF) 
             {
                 SMB_fans = new uint?[2,2];
             }
@@ -233,53 +272,58 @@ namespace Enclsoure
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
             Console.WriteLine("!!NumOfHDSlots = 0x{0:x} ", I2connection.NumOfHDSlots);
+            PD_OC_blink_thread = new Thread(PD_OC_Blink);
         }
 
         public void GetEnclosureData(ref Dictionary<string, uint?[]> Outdata)
         //public void Test()
         {
+            
             Enclosure_GET_fan();
             Enclosure_GET_volate();
             Enclosure_GET_temperatures();
-            Enclosure_GET_led();
-            Fan_LED_control();
-            VerifyPDtemp();
-            /*if only use equal mark and after clear the target will also clear.*/
-
-            Thermal_Management();
-
-            for (int i = 0; i < outdata.all_temperatures.Length; i++)
+            if (Model_ID != 0xffff)
             {
-                outdata.all_temperatures[i] = (TempObj.cur_stat[i] << 24) | outdata.all_temperatures[i];
+                Enclosure_GET_led();
+                Fan_LED_control();
+                VerifyPDtemp();
+                /*if only use equal mark and after clear the target will also clear.*/
+
+                Thermal_Management();
+                if (HDD_OC_blink && !(Blink_trigger))
+                {
+                    Prom_Enclosure_Serives.Log_File.FileLog("HDD_OC_blink detect");
+                    Console.WriteLine("!!HDD_OC_blink true");
+                    if ((PD_OC_blink_thread.ThreadState == ThreadState.Unstarted))
+                    {
+                        Console.WriteLine("!!PD_OC_blink_thread.ThreadState={0}", PD_OC_blink_thread.ThreadState);
+                        PD_OC_blink_thread.Start();
+                    }
+                    if((PD_OC_blink_thread.ThreadState == ThreadState.Stopped))
+                    {
+                        Console.WriteLine("PD_OC_blink_thread.ThreadState={0}", PD_OC_blink_thread.ThreadState);
+                        PD_OC_blink_thread=new Thread(PD_OC_Blink);
+                        PD_OC_blink_thread.Start();
+                    }
+                }
+
+
+                for (int i = 0; i < outdata.all_temperatures.Length; i++)
+                {
+                    outdata.all_temperatures[i] = (TempObj.cur_stat[i] << 24) | outdata.all_temperatures[i];
+                }
+                sensorData.Add("Led", outdata.all_leds);
+
+
             }
-
-
             sensorData.Add("Temperature", outdata.all_temperatures);
             sensorData.Add("Fan", outdata.all_fans);
             sensorData.Add("Voltage", outdata.all_voltages);
-            sensorData.Add("Led", outdata.all_leds);
+            //sensorData.Add("Led", outdata.all_leds);
             //
 
             Outdata = new Dictionary<string, uint?[]>(sensorData); 
             sensorData.Clear();
-
-        }
-
-
-        public void show(uint slave, uint offset, uint length)
-        {           
-            int chip = 0;
-            uint[] data = new uint[length];
-            Console.WriteLine("try");
-
-            chip = this.NCT.GetChipID();
-            Console.WriteLine("chip = 0x{0:x} ", chip);
-
-            Enclosure_GET_fan();
-            Enclosure_GET_volate();
-            Enclosure_GET_temperatures();
-
-            //SMB.ReadSMB(slave, offset, length, ref data);
 
         }
 
@@ -296,7 +340,7 @@ namespace Enclsoure
                // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
                 outdata.all_fans[i] = (NCT_fans[i, 1] << 24) | NCT_fans[i, 0];
             }
-            if (Model_ID != Model_VA8020)
+            if (Model_ID != Model_VA8020 && Model_ID != 0xFFFF)
             {
                 NCT7802.Nct7802y_get_fan_speed(0x01, ref SMB_fans);
                 NCT7802.Nct7802y_get_fan_speed(0x02, ref SMB_fans);
@@ -323,15 +367,20 @@ namespace Enclsoure
         }
         private void Enclosure_GET_temperatures()
         {
-            NCT.Get_Temperature(ref NCT_temperatures);
+            /*NCT.Get_Temperature(ref NCT_temperatures);
             Array.Copy(NCT_temperatures, outdata.all_temperatures, NCT_temperatures.Length);
 
             CPU.GetCPUTEMP(ref CPU_temperatures);
-
-            Array.Copy(CPU_temperatures, 0, outdata.all_temperatures, NCT_temperatures.Length, 1);
+            Array.Copy(CPU_temperatures, 0, outdata.all_temperatures, NCT_temperatures.Length, CPU_temperatures.Length);*/
 
             //sensorData.Add("Temperature", outdata.all_temperatures);
-            
+
+            NCT.Get_LPCIO_CPU_Temperature(ref CPU_temperatures);
+          //  CPU.GetCPUTEMP(ref CPU_temperatures);
+            Array.Copy(CPU_temperatures, outdata.all_temperatures, CPU_temperatures.Length);
+
+            NCT.Get_Temperature(ref NCT_temperatures);
+            Array.Copy(NCT_temperatures, 0, outdata.all_temperatures, CPU_temperatures.Length, NCT_temperatures.Length);
 
         }
 
@@ -353,18 +402,21 @@ namespace Enclsoure
             //HDD
             CheckPDTEMPstatus();
             ProcessPDTemperatureSts();
-
+            FAN_CHANGE_time_diff = DateTime.Now - FAN_CHANGE_Time_offset;
             if ((Fan_control_flag & FAN_Max) == FAN_Max)
             {
                 AUTO_FAN(FAN_Max);
+                FAN_CHANGE_Time_offset = DateTime.Now;
             }
-            else if ((Fan_control_flag&FAN_Increase)==FAN_Increase)
+            else if (((Fan_control_flag&FAN_Increase)==FAN_Increase)&& (FAN_CHANGE_time_diff.Ticks/10)> (180* 1000000))//&& now-timer>180
             {
                 AUTO_FAN(FAN_Increase);
+                FAN_CHANGE_Time_offset = DateTime.Now;
             }
-            else if ((Fan_control_flag&FAN_Decrease)==FAN_Decrease)
+            else if (((Fan_control_flag&FAN_Decrease)==FAN_Decrease)&& (FAN_CHANGE_time_diff.Ticks/10) > (300 * 1000000))//&& now-timer>300
             {
                 AUTO_FAN(FAN_Decrease);
+                FAN_CHANGE_Time_offset = DateTime.Now;
             }
             Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
             Fan_control_flag = FAN_Invalid;
@@ -375,19 +427,26 @@ namespace Enclsoure
         {
             for(int i=0; i< outdata.all_temperatures.Length;i++)
             {
+
                 //Console.WriteLine("outdata.all_temperatures[{0}] = {1} ", i, outdata.all_temperatures[i]);
-               // Console.WriteLine(" NOW  Temp_OW_threshold[{0}] : 0x{1}", i, TempObj.Temp_OW_threshold[i]);
-               // Console.WriteLine(" NOW  Temp_OC_threshold[{0}] : 0x{1}", i, TempObj.Temp_OC_threshold[i]);
+                // Console.WriteLine(" NOW  Temp_OW_threshold[{0}] : 0x{1}", i, TempObj.Temp_OW_threshold[i]);
+                // Console.WriteLine(" NOW  Temp_OC_threshold[{0}] : 0x{1}", i, TempObj.Temp_OC_threshold[i]);
                 /*with out previous status*/
                 if (TempObj.prev_temp[i]==Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
                 {
                     if(outdata.all_temperatures[i] >= TempObj.Temp_OC_threshold[i])
                     {
                         TempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                                              Convert.ToUInt32(i));
                     }
                     else if (outdata.all_temperatures[i] >= TempObj.Temp_OW_threshold[i])
                     {
                         TempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+                                              Convert.ToUInt32(i));
                     }
                     else
                     {
@@ -402,37 +461,42 @@ namespace Enclsoure
                     /* Normal/Over warning  -> Over critical */
                     TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
                     TempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
-
-                    Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-                    // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
-                    //                      I2connection_Events.EVT_CODE_SUBSYS_TEMP_ABOVE_CRITICAL,
-                    //                      0);
-
+                    if ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                    {
+                        Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                             I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                                             Convert.ToUInt32(i));
+                        TempObj.Controller_OC_time[i] = DateTime.Now; ////update time base;
+                    }
                 }
            else if (!((TempObj.prev_stat[i] & 0x03) == 0x03)&&
                      ( outdata.all_temperatures[i] > TempObj.Temp_OW_threshold[i]))
                 {
-                        /*
-                        ** VessApp CPU temperature is not stable, it may jump for over 3
-                        ** degrees between 2 times temperature monitoring and soon be lower
-                        ** than threshold, we try to check 2 times for make sure the
-                        ** temperature is 'really' over warning temperaure threshold
-                        */
+                    /*
+                    ** VessApp CPU temperature is not stable, it may jump for over 3
+                    ** degrees between 2 times temperature monitoring and soon be lower
+                    ** than threshold, we try to check 2 times for make sure the
+                    ** temperature is 'really' over warning temperaure threshold
+                    */
 
-                        /*
-                        ** check if the previous temperature is also over warning temperaure
-                        ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
-                        */
+                    /*
+                    ** check if the previous temperature is also over warning temperaure
+                    ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
+                    */
 
-                    if(TempObj.prev_temp[i]>TempObj.Temp_OW_threshold[i]&&
+                    if (TempObj.prev_temp[i] > TempObj.Temp_OW_threshold[i] &&
                        !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                     {
                         TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
                         TempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
                         Console.WriteLine("2nd time over warn-threshold.\n");
-                        // I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
-                        //                       I2connection_Events.EVT_CODE_SUBSYS_TEMP_ABOVE_WARNING,
-                        //                       0);
+                        if ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                                I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+                                                Convert.ToUInt32(i));
+                        }
 
                     }
                     else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
@@ -468,13 +532,30 @@ namespace Enclsoure
                                              Enclsoure_Constants.ENC_TEMP_STAT_UW);
                     TempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
                     Console.WriteLine("Joel : Over warning -> normal.\n");
-                    //I2connection.SetEvent(I2connection_Events.EVT_CLASS_SUBSYSTEM,
-                     //                     I2connection_Events.EVT_CODE_SUBSYS_TEMP_RETURNED_TO_NORMAL,
-                      //                    0);
+                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                          I2connection_Events.EVT_CODE_TEMP_RETURNED_TO_NORMAL,
+                                          Convert.ToUInt32(i));
                 }
                 else
                 {
                     /* Over warning/critical to normal */
+
+
+                }
+
+                //check temp[i] is over critical 1min?
+                if ((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                {
+                  if((DateTime.Now-TempObj.Controller_OC_time[i]).Ticks > (60 * 10000000))
+                    {
+                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                          I2connection_Events.EVT_CODE_TEMP_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
+                                          Convert.ToUInt32(i));
+                    }
+                }
+                else
+                {
+                    TempObj.Controller_OC_time[i] = DateTime.Now;
                 }
             }
         }
@@ -541,7 +622,7 @@ namespace Enclsoure
                     Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.Temp[" + i + "]=" + outdata.all_temperatures[i]);
                     //AUTO_FAN(0x2| fanID);
                     Fan_control_flag |= FAN_Decrease;
-                    if (FAN_LEVEL == 0x03)
+                    if (FAN_LEVEL == FAN_Default_LEVEL+1)
                     {
                         TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
                     }
@@ -556,6 +637,13 @@ namespace Enclsoure
             switch (Control)
             {
                 case FAN_Max://MAX FAN
+                    if(FAN_LEVEL!=0xF)
+                    {
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
+                                         I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_INCREASED,
+                                         0);
+                    }
+                    FAN_LEVEL =0xf;
                     NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, 0xf);
                     if (Model_ID != Model_VA8020)
                     {
@@ -564,10 +652,9 @@ namespace Enclsoure
                     else
                     {
                         NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                        //NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_AUXTIN, FAN_LEVEL);
                     }
-                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
-                                          I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_INCREASED,
-                                          0);
+
                     Fan_control_flag = 0x01;
                     break;
                     
@@ -584,6 +671,7 @@ namespace Enclsoure
                         else
                         {
                             NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                        //    NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_AUXTIN, FAN_LEVEL);
                         }
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_INCREASED,
@@ -593,10 +681,10 @@ namespace Enclsoure
                     break;
 
                 case FAN_Decrease://decrease Fan
-                    if (FAN_LEVEL != 0xF)
+                    if (FAN_LEVEL != 0x0)
                     {
                         FAN_LEVEL -= 1;
-                        FAN_LEVEL = FAN_LEVEL < 0x02 ? 0x02 : FAN_LEVEL ;
+                        FAN_LEVEL = FAN_LEVEL < FAN_Default_LEVEL ? FAN_Default_LEVEL : FAN_LEVEL ;
                         NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_CPUTIN, FAN_LEVEL);
                         if (Model_ID != Model_VA8020)
                         {
@@ -605,6 +693,7 @@ namespace Enclsoure
                         else
                         {
                             NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, FAN_LEVEL);
+                         //   NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_AUXTIN, FAN_LEVEL);
                         }
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                               I2connection_Events.EVT_CODE_COOLING_DEVICE_SPEED_DECREASED,
@@ -666,7 +755,10 @@ namespace Enclsoure
                 else
                 {
                     if (SYS_SET_FAN != 0)
-                     NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, SYS_SET_FAN);
+                    {
+                        NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_SYSTIN, SYS_SET_FAN);
+                       // NCT.Set_Fan(NCT5567_Constants.NCT5567_ENV_CTRL_FAN_SEN_AUXTIN, SYS_SET_FAN);
+                    }
                 }
                 for (int i = 0; i < Date.Length; i++)
                 {
@@ -681,24 +773,151 @@ namespace Enclsoure
             }
         }
 
-        public void Enclosure_SET_Temp_threshold(uint?[] Date)
+        public void Enclosure_SET_Control_Temp_threshold(uint?[] Date)
         {
             //(TempObj.Temp_OW_threshold
+            uint OW_temp = 0, OC_temp = 0;
+            OW_temp= (uint)Date[0] < 45 ? 45 : (uint)Date[0];
+            OC_temp = (uint)Date[1] > OW_temp ? (uint)Date[1] : OW_temp + 0x5;
             try
             {
                 for (int i = 0; i < TempObj.Temp_OW_threshold.Length; i++)
                 {
 
-                    TempObj.Temp_OW_threshold[i] = (uint)Date[0] < 45? 45 : (uint)Date[0];
-                    TempObj.Temp_OC_threshold[i] = (uint)Date[1] > (uint)Date[0]? (uint)Date[1]: (uint)Date[0]+0x5;
-                    Console.WriteLine(" SET  Temp_OW_threshold[{0}] : 0x{1}", i, TempObj.Temp_OW_threshold[i]);
-                    Console.WriteLine(" SET  Temp_OC_threshold[{0}] : 0x{1}", i, TempObj.Temp_OC_threshold[i]);
+                    TempObj.Temp_OW_threshold[i] = OW_temp;
+                    TempObj.Temp_OC_threshold[i] = OC_temp;
+                    Console.WriteLine(" SET Controller Temp_OW_threshold[{0}] : 0x{1}", i, TempObj.Temp_OW_threshold[i]);
+                    Prom_Enclosure_Serives.Log_File.FileLog(" SET Controller Temp_OW_threshold["+ i+"] : " + TempObj.Temp_OW_threshold[i]);
+                    Console.WriteLine(" SET Controller Temp_OC_threshold[{0}] : 0x{1}", i, TempObj.Temp_OC_threshold[i]);
+                    Prom_Enclosure_Serives.Log_File.FileLog(" SET Controller Temp_OC_threshold[" + i + "] : " + TempObj.Temp_OC_threshold[i]);
                 }
-
+                Enclsoure_class.Temp_OC_threshold = OC_temp;
+                Enclsoure_class.Temp_OW_threshold = OW_temp;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Enclosure_SET_Temp_threshold fail:{0}", ex);
+            }
+        }
+
+        public void Enclosure_SET_HDD_Temp_threshold(uint?[] Date)
+        {
+            //(TempObj.Temp_OW_threshold
+            uint OW_temp = 0, OC_temp = 0;
+            OW_temp= (uint)Date[0] < 45 ? 45 : (uint)Date[0];
+            OC_temp= (uint)Date[1] > OW_temp ? (uint)Date[1] : OW_temp + 0x5;
+            try
+            {
+                for (int i = 0; i < HDD_temp.HDD_OW_threshold.Length; i++)
+                {
+
+                    HDD_temp.HDD_OW_threshold[i] = OW_temp;
+                    HDD_temp.HDD_OC_threshold[i] = OC_temp;
+
+                    Console.WriteLine(" SET PD Temp_OW_threshold[{0}] : 0x{1}", i, HDD_temp.HDD_OW_threshold[i]);
+                    Prom_Enclosure_Serives.Log_File.FileLog(" SET PD Temp_OW_threshold[" + i + "] : " + HDD_temp.HDD_OW_threshold[i]);
+                    Console.WriteLine(" SET PD Temp_OC_threshold[{0}] : 0x{1}", i, HDD_temp.HDD_OC_threshold[i]);
+                    Prom_Enclosure_Serives.Log_File.FileLog(" SET PD Temp_OC_threshold[" + i + "] : " + HDD_temp.HDD_OC_threshold[i]);
+                    // Console.WriteLine(" SET  Temp_OW_threshold[{0}] : 0x{1}", i, TempObj.Temp_OW_threshold[i]);
+                    // Console.WriteLine(" SET  Temp_OC_threshold[{0}] : 0x{1}", i, TempObj.Temp_OC_threshold[i]);
+                }
+                Enclsoure_class.HDD_OW_threshold = OW_temp;
+                Enclsoure_class.HDD_OC_threshold = OC_temp;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Enclosure_SET_HDD_Temp_threshold fail:{0}", ex);
+            }
+        }
+
+        // public void Blink(Object source, ElapsedEventArgs e)
+        private static bool Blink_flag = false;
+        public void Locate_Blink()
+        {
+            HDD_OC_blink = false;
+            DateTime start_time = DateTime.Now;
+            TimeSpan time_over;
+            Blink_trigger = true;
+              Blink_flag = !Blink_flag;
+            uint i;
+                do
+                {
+                ////light off
+                    bool check = Blink_flag;
+                    i = (~(TCA6416.A20P0 & Locatemask[0, 0])) & TCA6416.A20P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x20, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(5);
+                    i = (~(TCA6416.A20P1 & Locatemask[0, 1])) & TCA6416.A20P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x20, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(5);
+                    i = (~(TCA6416.A21P0 & Locatemask[1, 0])) & TCA6416.A21P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(5);
+                    i = (~(TCA6416.A21P1 & Locatemask[1, 1])) & TCA6416.A21P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(1000);
+                    ////light on
+                    i = (TCA6416.A20P0 & Locatemask[0, 0])| TCA6416.A20P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x20, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(5);
+                    i = TCA6416.A20P1 & Locatemask[0, 1]| TCA6416.A20P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x20, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(5);
+                    i = TCA6416.A21P0 & Locatemask[1, 0]| TCA6416.A21P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(5);
+                    i = TCA6416.A21P1 & Locatemask[1, 1]| TCA6416.A21P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(1000);
+                    time_over = DateTime.Now- start_time;
+                    if (check != Blink_flag)
+                        return;
+                    if (time_over.Ticks> 60 * 10000000)
+                    {
+                        Blink_flag = false;
+                        Blink_trigger = false;
+                        return;
+                    }
+                } while (true);
+            
+        }
+        public void PD_OC_Blink()
+        {
+            uint i;
+            if (GlobeError_LED_trigger == false)
+            {
+                tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_RED);
+            }
+
+            do
+            {
+                ////light off
+                if (Model_ID == Model_VA8020)
+                {
+                    i = (~(TCA6416.A21P0 & 0x0C)) & TCA6416.A21P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(1000);
+                    ////light on
+                    i = (TCA6416.A21P0 & 0x0C) | TCA6416.A21P0;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_0, ref i);
+                    Thread.Sleep(1000);
+                }
+                else
+                {
+                    i = (~(TCA6416.A21P1 & 0x03)) & TCA6416.A21P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(1000);
+                    ////light on
+                    i = (TCA6416.A21P1 & 0x03) | TCA6416.A21P1;
+                    tca6416.tca6416a_set_gpio_port_value(0x21, TCA6416_Constants.TCA6416A_PORT_1, ref i);
+                    Thread.Sleep(1000);
+                }
+
+            } while (HDD_OC_blink && !(Blink_trigger));//while ( HDD_OC_blink && (Blink_trigger==false));
+            if (GlobeError_LED_trigger == false)
+            {
+                tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN);
+                Console.WriteLine("PD_OC_Blink finish and change GLOBE_ERR to green");
             }
         }
 
@@ -717,15 +936,15 @@ namespace Enclsoure
                 Console.WriteLine("port0=[{0:x}]", port0_data);
                 
                 Console.WriteLine("port1=[{0:x}]", port1_data);
-                TCA6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_0, port0_data);
-                TCA6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_1, port1_data);
+                tca6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_0, port0_data);
+                tca6416.encSetLedStatus(chipId, TCA6416_Constants.TCA6416A_PORT_1, port1_data);
             }
 
         }
 
         public void Enclosure_GET_led()
         {
-            TCA6416.encGetLedStatus(ref TCA_leds);
+            tca6416.encGetLedStatus(ref TCA_leds);
            // Console.WriteLine("Length=[{0:x}]", TCA_leds.Length);
             Array.Copy(TCA_leds, outdata.all_leds, TCA_leds.Length);
             //sensorData.Add("Led", outdata.all_leds);
@@ -745,27 +964,27 @@ namespace Enclsoure
                 {
                     Console.WriteLine("Fan_error=0");
                     Prom_Enclosure_Serives.Log_File.FileLog("Fan_error=0");
-                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_GREEN);
+                    tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_GREEN);
                     if (GlobeError_LED_trigger == false)
-                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
+                    { tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
                     Fan_color = TCA6416_Constants.ENC_LED_GREEN;
                 }
-                else if (Fan_error == 1)
+               /* else if (Fan_error == 1)
                 {
                     Console.WriteLine("Fan_error=1");
                     Prom_Enclosure_Serives.Log_File.FileLog("Fan_error=1");
-                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_AMBER);
+                    tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_AMBER);
                     if (GlobeError_LED_trigger == false)
-                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
+                    { tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_GREEN); }
                     Fan_color = TCA6416_Constants.ENC_LED_AMBER;
-                }
-                else if (Fan_error >= 2)
+                }*/
+                else if (Fan_error >= 1)
                 {
-                    Console.WriteLine("Fan_error>2");
-                    Prom_Enclosure_Serives.Log_File.FileLog("Fan_error>2");
-                    TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_RED);
+                    Console.WriteLine("Fan_error>1");
+                    Prom_Enclosure_Serives.Log_File.FileLog("Fan_error>=1;FAN_error="+ Fan_error);
+                    tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_FAN, TCA6416_Constants.ENC_LED_RED);
                     if (GlobeError_LED_trigger == false)
-                    { TCA6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_RED); }
+                    { tca6416.NCT6414_FAN_Control(TCA6416_Constants.ENC_LED_GLOBE_ERR, TCA6416_Constants.ENC_LED_RED); }
                     Fan_color = TCA6416_Constants.ENC_LED_RED;
                 }
                 FAN_LED_trigger = false;
@@ -783,6 +1002,7 @@ namespace Enclsoure
 
         public void CheckPDTEMPstatus()
         {
+            bool HDD_OC_detect = false;
             for (int i = 0; i < I2connection.NumOfHDSlots; i++)
             {
                 //Console.WriteLine("outdata.all_temperatures[{0}] = {1} ", i, HDD_temp.cur_temp[i]);
@@ -812,11 +1032,14 @@ namespace Enclsoure
                     /* Normal/Over warning  -> Over critical */
                     HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
                     HDD_temp.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
-
-                    Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                          I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
-                                          0);
+                    if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                    {
+                        Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                              I2connection_Events.EVT_CODE_PD_HI_CRITICAL_TEMP_OVER,
+                                              Convert.ToUInt32(i));
+                        HDD_temp.PD_OC_time[i] = DateTime.Now;
+                    }
                 }
                 else if (!((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
                           (HDD_temp.cur_temp[i] > HDD_temp.HDD_OW_threshold[i]))
@@ -839,9 +1062,12 @@ namespace Enclsoure
                         HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
                         HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
                         Console.WriteLine("2nd time over warn-threshold.\n");
-                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
-                                              0);
+                        if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                              I2connection_Events.EVT_CODE_PD_TEMP_OVER,
+                                              Convert.ToUInt32(i));
+                        }
                     }
                     else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                     {
@@ -876,15 +1102,33 @@ namespace Enclsoure
                                              Enclsoure_Constants.ENC_TEMP_STAT_UW);
                     HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
                     Console.WriteLine("Joel : Over warning -> normal.\n");
-                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                          I2connection_Events.EVT_CODE_TEMP_RETURNED_TO_NORMAL,
-                                          0);
+                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                          I2connection_Events.EVT_CODE_PD_TEMP_RETURNED_TO_NORMAL,
+                                          Convert.ToUInt32(i));
                 }
                 else
                 {
                     /* Over warning/critical to normal */
                 }
+                if((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC)== Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                {
+                    // blink flag on;
+                    HDD_OC_detect = true;
+
+                    if ((DateTime.Now - HDD_temp.PD_OC_time[i]).Ticks > (60 * 10000000))
+                    {
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                         I2connection_Events.EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
+                                         Convert.ToUInt32(i));
+                    }
+                }
+                else
+                {
+                    HDD_temp.PD_OC_time[i] = DateTime.Now;
+                }
             }
+
+            HDD_OC_blink = HDD_OC_detect;
         }
 
         private void ProcessPDTemperatureSts()
@@ -929,7 +1173,7 @@ namespace Enclsoure
                     Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
                     Fan_control_flag |= FAN_Decrease;
                     //AUTO_FAN(0x2| FAN_MASK_SYS);
-                    if (FAN_LEVEL == 0x02)
+                    if (FAN_LEVEL == FAN_Default_LEVEL)
                     {
                         HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
                     }

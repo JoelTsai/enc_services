@@ -18,7 +18,8 @@ namespace Chip.Contrl
     {
 
         //public const uint[,] NCT7802Y_ENV_CTRL_FAN_MATRIX = { NIDEC, SYSTEM_FAN , {0x0F,0x1F,0x2F,0x3F,0x4F,0x5F,0x6F,0x7F,0x8F,0x9F,0xAF,0xBF,0xCF,0xDF,0xEF,0xFE}};
-        internal static readonly uint[] FAN_Level = { 0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F, 0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFE };
+        internal static readonly uint[] NIDEC_FAN_Level = { 0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F, 0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFE };
+        internal static readonly uint[] DELTA_FAN_Level = { 0x4F, 0x5F, 0x68, 0x6F, 0x78, 0x7F, 0x88, 0x8F, 0x98, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFF };
 
         internal const uint BLEN = 1;
         internal const uint WLEN = 2;
@@ -195,14 +196,14 @@ namespace Chip.Contrl
     public class NCT7802
     {
         //public PCHSMBUS SMB;
-        private static bool[] FAN_install_flag;
-
+        private static uint[] FAN_install_flag;
+        private uint[] FAN_Level;
         public NCT7802()
         {
           uint  addr = NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR;
-            FAN_install_flag = new bool[2];
+            FAN_install_flag = new uint[2];
             for (int i = 0; i < FAN_install_flag.Length; i++)
-                FAN_install_flag[i] = false;
+                FAN_install_flag[i] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
 
             if(Enclsoure.Enclsoure_class.Model_ID==Enclsoure.Enclsoure_class.Model_VA8100)
             {
@@ -243,10 +244,13 @@ namespace Chip.Contrl
                     Console.WriteLine("Nct7802y I2C write fail.\n");
 
                     }
-                
+                FAN_Level = NCT7802_Constants.NIDEC_FAN_Level;
             }
-           // this.SMB = new PCHSMBUS();
-
+            // this.SMB = new PCHSMBUS();
+            else
+            {
+                FAN_Level = NCT7802_Constants.DELTA_FAN_Level;
+            }
         }
 
         public int Nct7802y_write_value(uint addr, uint reg, ref uint data)
@@ -283,80 +287,120 @@ namespace Chip.Contrl
         public void Nct7802y_get_fan_speed(uint FanNum, ref uint?[,] Fandata)
         {
             uint offset = 0;
-            uint ldata, hdata;
+            uint ldata = 0, hdata = 0;
             uint addr;
             uint Fanlevel = 0;
             uint fanCount;
-            uint fanSpeed;
+            uint fanSpeed=0;
             uint realFanSpeed = 0;
+            byte fail_time = 0;
+
             addr = NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR;
-
-            Nct7802y_set_bank(NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_BANK_DATA_0);
-
-
-            switch (FanNum)
+            while (fail_time < 3)
             {
-                case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN0:
-                    offset = NCT7802_Constants.NCT7802Y_FAN_IN1_COUNT_REG;
-                    break;
-
-                case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN1:
-                    offset = NCT7802_Constants.NCT7802Y_FAN_IN2_COUNT_REG;
-                    break;
-
-                default:
-                    break;
-            }
-
-            hdata = 0;
-            if (Nct7802y_read_value(addr, offset, ref hdata) == -1)
-            {
-                Console.WriteLine("Nct7802y I2C read fail.\n");
-            }
-            Console.WriteLine("FanNum={0:x} hdata={1:x}.\n", FanNum, hdata);
-            ldata = 0;
-            offset = NCT7802_Constants.NCT7802Y_FAN_LOW_COUNT_REG;
-
-            if (Nct7802y_read_value(addr, offset, ref ldata) == -1)
-            {
-                Console.WriteLine("Nct7802y I2C read fail.\n");
-            }
-
-            if ((hdata == 0xFF) && (ldata == 0xF8))
-            {
-                fanSpeed = 0;
-                if (FAN_install_flag[FanNum-1] == false)
+                Nct7802y_set_bank(NCT7802_Constants.NCT7802Y_BP_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_BANK_DATA_0);
+                switch (FanNum)
                 {
-                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
-                                          I2connection_Events.EVT_CODE_COOLING_DEVICE_NOT_INSTALLED,
-                                          1);
-                    FAN_install_flag[FanNum-1] = true;
-                    Enclsoure.Enclsoure_class.Fan_error += 1;
-                    Console.WriteLine("NO install fanerror={0}.", Enclsoure.Enclsoure_class.Fan_error);
-                    Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
+                    case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN0:
+                        offset = NCT7802_Constants.NCT7802Y_FAN_IN1_COUNT_REG;
+                        break;
+
+                    case NCT7802_Constants.NCT7802Y_2U8_BP_DEVICE_FAN1:
+                        offset = NCT7802_Constants.NCT7802Y_FAN_IN2_COUNT_REG;
+                        break;
+
+                    default:
+                        break;
                 }
-                Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
+                if (Nct7802y_read_value(addr, offset, ref hdata) == -1)
+                {
+                    Console.WriteLine("Nct7802y I2C read fail.\n");
+                }
+                Console.WriteLine("FanNum={0:x} hdata={1:x}.\n", FanNum, hdata);
+
+                offset = NCT7802_Constants.NCT7802Y_FAN_LOW_COUNT_REG;
+
+                if (Nct7802y_read_value(addr, offset, ref ldata) == -1)
+                {
+                    Console.WriteLine("Nct7802y I2C read fail.\n");
+                }
+                if (!((hdata == 0xFF) && (ldata == 0xF8)))
+                {
+                    fanCount = (hdata << 5) | (ldata >> 3);
+                    if (fanCount != 0)
+                    {
+                        fanSpeed = (fanCount >> 4);
+                    }
+                    else
+                    {
+                        fanSpeed = 0;
+                    }
+
+                    Nct7802y_get_fan_speed_trans(fanSpeed, ref realFanSpeed);
+                    if (!(0 < realFanSpeed && realFanSpeed < 600))
+                    {
+                        break;
+                    }
+                }
+                fail_time++;
+                System.Threading.Thread.Sleep(1000);
+            }
+            if (fail_time >= 3)
+            {
+                if  ((hdata == 0xFF) && (ldata == 0xF8))
+                {
+                    fanSpeed = 0;
+                    if ((FAN_install_flag[FanNum - 1] & Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED) != Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED)
+                    {
+                        if ((FAN_install_flag[FanNum - 1] & Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING) != Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING)
+                        {
+                            Enclsoure.Enclsoure_class.Fan_error += 1;
+                            Prom_Enclosure_Serives.Log_File.FileLog("no install +1="+ Enclsoure.Enclsoure_class.Fan_error);
+                        }
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
+                                              I2connection_Events.EVT_CODE_COOLING_DEVICE_NOT_INSTALLED,
+                                              FanNum);
+                        FAN_install_flag[FanNum - 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
+                        Console.WriteLine("NO install fanerror={0}.", Enclsoure.Enclsoure_class.Fan_error);
+                        Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Fan[" + FanNum + "]=FAN_NOT_INSTALLED");
+                    }
+                    Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED;
+                }
+                else
+                {
+                    if ((FAN_install_flag[FanNum - 1] & Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING) != Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING)
+                    {
+                        if ((FAN_install_flag[FanNum - 1] & Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED) != Enclsoure.Enclsoure_Constants.FAN_NOT_INSTALLED)
+                        {
+                            Prom_Enclosure_Serives.Log_File.FileLog("befoee MALFUNCTIONING +1=" + Enclsoure.Enclsoure_class.Fan_error);
+                            Enclsoure.Enclsoure_class.Fan_error += 1;
+                            Prom_Enclosure_Serives.Log_File.FileLog("MALFUNCTIONING +1="+Enclsoure.Enclsoure_class.Fan_error);
+                        }
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
+                                              I2connection_Events.EVT_CODE_COOLING_DEVICE_MALFUNCTIONING,
+                                              FanNum);
+                        FAN_install_flag[FanNum - 1] = Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING;
+                        Console.WriteLine("NO install fanerror={0}.", Enclsoure.Enclsoure_class.Fan_error);
+                        Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
+                        Prom_Enclosure_Serives.Log_File.FileLog("Fan[" + FanNum + "]=FAN_MALFUNCTIONING fanSpeed="+ fanSpeed);
+                    }
+                    Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING;
+                }
             }
 
             else
             {
-                fanCount = (hdata << 5) | (ldata >> 3);
-                if (fanCount != 0)
-                {
-                    fanSpeed = (fanCount >> 4);
-                }
-                else
-                {
-                    fanSpeed = 0;
-                }
-                if (FAN_install_flag[FanNum-1] == true)
+                if (FAN_install_flag[FanNum - 1] != Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL)
                 {
                     I2connection.SetEvent(I2connection_Events.EVT_CLASS_COOLING_DEVICE,
                                           I2connection_Events.EVT_CODE_COOLING_DEVICE_FUNCTIONAL,
-                                          1);
-                    FAN_install_flag[FanNum-1] = false;
-                    Enclsoure.Enclsoure_class.Fan_error -= 1;
+                                          FanNum);
+                    FAN_install_flag[FanNum-1] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
+                    if(Enclsoure.Enclsoure_class.Fan_error!=0)
+                         Enclsoure.Enclsoure_class.Fan_error -= 1;
                     Enclsoure.Enclsoure_class.FAN_LED_trigger = true;
+                    Prom_Enclosure_Serives.Log_File.FileLog("Fan[" + FanNum + "]=FAN_OPERATIONAL");
                 }
                 Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_OPERATIONAL;
             }
@@ -386,13 +430,17 @@ namespace Chip.Contrl
             {
                 Console.WriteLine("Nct7802y I2C read fail.\n");
             }
-            Nct7802y_get_fan_speed_trans(fanSpeed,ref realFanSpeed);
-            Console.WriteLine("realFanSpeed={0:x}", realFanSpeed);
-            if (0 < realFanSpeed && realFanSpeed < 600)
+
+            //Nct7802y_get_fan_speed_trans(fanSpeed,ref realFanSpeed);
+            //Console.WriteLine("realFanSpeed={0:x}", realFanSpeed);
+           /* if (0 < realFanSpeed && realFanSpeed < 600)
             {
                 Fandata[FanNum - 1, 1] = Enclsoure.Enclsoure_Constants.FAN_MALFUNCTIONING;
-            }
-            Fandata[FanNum-1,0] = (Fanlevel << 16) | (realFanSpeed);
+            }*/
+
+
+            //Fandata[FanNum-1,0] = (Fanlevel << 16) | (realFanSpeed);
+            Fandata[FanNum - 1, 0] = (Fanlevel << 16) | (fanSpeed);
         }
 
         public void Nct7802y_get_fan_speed_trans(uint fanSpeed, ref uint realFanSpeed)
@@ -446,7 +494,7 @@ namespace Chip.Contrl
                     break;
             }
 
-            fanlevel = NCT7802_Constants.FAN_Level[level];
+            fanlevel = FAN_Level[level];
             //fanlevel = level;
             Console.WriteLine("  level =  : 0x{0:x}", fanlevel);
             if (Nct7802y_write_value(addr, offset1, ref fanlevel) == -1)
