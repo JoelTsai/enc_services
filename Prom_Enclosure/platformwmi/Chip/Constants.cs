@@ -1,9 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿/*---------------------------------------------------------------------------**
+**          Filename    : Constants.cs                                       **
+**          Description : Constants                                          **
+**          Created on  :2019/12/12                                          **
+**          Created by  : Joel Tsai                                          **
+**         (C)Copyright Promise Technology Inc., 2019                        **
+**                    All Rights  Reserved.                                  **
+**---------------------------------------------------------------------------*/
 namespace Chip.Contrl
 {
     static class NCT7802_Constants
@@ -427,9 +429,5 @@ namespace Chip.Contrl
 
         internal const uint ENC_A3340R_PSU_DEFAULT_FAN_SPEED = 0x54;
         internal const uint ENC_A3340R_PSU_FULL_FAN_SPEED = 0xFF;
-    }
-
-    class Constants
-    {
     }
 }
