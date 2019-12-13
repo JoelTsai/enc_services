@@ -220,6 +220,19 @@ namespace Prom_Enclosure_Serives
                 if (localKey != null) localKey.Close();
             }
 
+            while (true)
+            {
+                Console.WriteLine("psuNum:");
+                uint psuNum = Convert.ToUInt32(Console.ReadLine());
+                Console.WriteLine("status:");
+                uint status = Convert.ToUInt32(Console.ReadLine());
+                if (psuNum == 99)
+                    return;
+
+                Enclosure.PSU.PSUSetFanSpeed(psuNum,status);
+            }
+
+
             Blink_timer = new System.Timers.Timer
             {
                 Interval = 1 * 1000

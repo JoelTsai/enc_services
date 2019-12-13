@@ -22,6 +22,7 @@ namespace Chip.Contrl
         internal const uint NCT7802Y_I2C_FAILURE = 1;
 
         internal const uint NCT7802Y_PSU_LED_INIT = 0x0A;
+        internal const uint NCT7802Y_PSU_LED_CONFIG_INIT = 0xC0;
         //internal const uint NCT7802Y_BP_HW_MONITOR_ADDR     = 0x2C;
         internal const uint NCT7802Y_BP_HW_MONITOR_ADDR = 0x2E;
         internal const uint NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR = 0x28;
@@ -405,6 +406,27 @@ namespace Chip.Contrl
         internal const uint PCH200_I2C_DEV_PSU_1 = 1;
         internal const uint PCH200_I2C_DEV_PSU_2 = 2;
 
+        internal const uint PCH200_I2C_PSU_TEMP_SENSOR_0 = 0;
+        internal const uint PCH200_I2C_PSU_TEMP_SENSOR_1 = 1;
+        internal const uint PCH200_I2C_PSU_TEMP_SENSOR_2 = 2;
+        internal const uint PCH200_I2C_PSU_TEMP_SENSOR_3 = 3;
+    }
+
+
+    static class PSU_Constants
+    {
+        internal const uint ENC_LED_OFF = 0x00;
+        internal const uint ENC_LED_GREEN = 0x01;
+        internal const uint ENC_LED_RED = 0x02;
+        internal const uint ENC_LED_AMBER = 0x03;
+        internal const uint ENC_LED_DARK = 0x80;
+
+
+        internal const uint ENC_PSU_DEFAULT_FAN_SPEED = 0x07;
+        internal const uint ENC_PSU_FULL_FAN_SPEED = 0x0F;
+
+        internal const uint ENC_A3340R_PSU_DEFAULT_FAN_SPEED = 0x54;
+        internal const uint ENC_A3340R_PSU_FULL_FAN_SPEED = 0xFF;
     }
 
     class Constants
