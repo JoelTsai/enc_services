@@ -152,7 +152,7 @@ namespace Enclsoure
         // public CPU CPU;
         public TCA6416 tca6416;
         All_senserdata outdata;
-        TEMPOBJ TempObj, PSU_temp;
+        TEMPOBJ TempObj, PSU_tempObj;
         HDD_TEMPOBJ HDD_temp;
 
         private static readonly uint FAN_Default_LEVEL = 0x2;
@@ -288,7 +288,7 @@ namespace Enclsoure
 
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
-            PSU_temp = new TEMPOBJ(Convert.ToInt32(PSU_Constants.PSU_NUM));
+            PSU_tempObj = new TEMPOBJ(Convert.ToInt32(PSU_Constants.PSU_NUM));
 
             Console.WriteLine("!!NumOfHDSlots = 0x{0:x} ", I2connection.NumOfHDSlots);
             PD_OC_blink_thread = new Thread(PD_OC_Blink);
@@ -439,6 +439,11 @@ namespace Enclsoure
             //HDD
             CheckPDTEMPstatus();
             ProcessPDTemperatureSts();
+
+            //PSU
+            CheckPSUTEMPstatus();
+
+
             FAN_CHANGE_time_diff = DateTime.Now - FAN_CHANGE_Time_offset;
             if ((Fan_control_flag & FAN_Max) == FAN_Max)
             {
@@ -459,7 +464,9 @@ namespace Enclsoure
             Fan_control_flag = FAN_Invalid;
             UpdatePrevTempObjStat();
         }
-
+#region Controller thermal    
+        
+        #region Check Controller temp status 
         public void CheckTEMPstatus()
         {
             for(int i=0; i< outdata.all_temperatures.Length;i++)
@@ -596,7 +603,448 @@ namespace Enclsoure
                 }
             }
         }
+        #endregion
 
+        #region acrroding Controller status to change fan
+        private void ProcessTemperatureSts()
+        {
+            // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
+            uint fanID = FAN_MASK_CPU | FAN_MASK_SYS;
+            for (int i = 0; i < outdata.all_temperatures.Length; i++)
+            {
+                //if (i == 0)
+                //fanID = FAN_MASK_SYS;
+
+                if (((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                    ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                {
+                    //FAN MAX
+                    Console.WriteLine("FAN MAX.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX. Temp[" + i + "]=" + outdata.all_temperatures[i]);
+                    //AUTO_FAN(0xF| fanID);
+                    Fan_control_flag |= FAN_Max;
+                }
+                else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         ((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                        !((TempObj.prev_stat[i] & 0x03) == 0x03) &&
+                        !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                {
+                    //fan increase
+                    Console.WriteLine("FAN increase.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.Temp[" + i + "]=" + outdata.all_temperatures[i]);
+                    Fan_control_flag |= FAN_Increase;
+                    //AUTO_FAN(0x1| fanID);
+                }
+                /* else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) |
+                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW))
+                 {
+                     //fan decrease   /Enclsoure_Constants.ENC_TEMP_STAT_UW
+                     Console.WriteLine("FAN decrease.\n");
+                 }*/
+                else if (((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UW) == Enclsoure_Constants.ENC_TEMP_STAT_UW))
+                {
+                    //if Fan to standard mode then Cur_stat ~ UW;
+                    Console.WriteLine("FAN decrease.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.Temp[" + i + "]=" + outdata.all_temperatures[i]);
+                    //AUTO_FAN(0x2| fanID);
+                    Fan_control_flag |= FAN_Decrease;
+                    if (FAN_LEVEL == FAN_Default_LEVEL + 1)
+                    {
+                        TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    }
+                }
+            }
+        }
+        #endregion
+#endregion
+
+#region PD thermal  
+
+        #region Check PD temp status 
+        public void CheckPDTEMPstatus()
+        {
+            bool HDD_OC_detect = false;
+            for (int i = 0; i < I2connection.NumOfHDSlots; i++)
+            {
+                //Console.WriteLine("outdata.all_temperatures[{0}] = {1} ", i, HDD_temp.cur_temp[i]);
+                if (HDD_temp.cur_temp[i] == 0xff)//HDD temp invalid
+                    continue;
+                /*with out previous status*/
+                if (HDD_temp.prev_temp[i] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
+                {
+                    if (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OC_threshold[i])
+                    {
+                        HDD_temp.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
+                    }
+                    else if (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OW_threshold[i])
+                    {
+                        HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                    }
+                    else
+                    {
+                        HDD_temp.cur_stat[i] = 0;
+                    }
+                    continue;
+                }
+                if (!((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                     (HDD_temp.prev_temp[i] >= HDD_temp.HDD_OC_threshold[i]) &&
+                     (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OC_threshold[i]))
+                {
+                    /* Normal/Over warning  -> Over critical */
+                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
+                    HDD_temp.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
+                    if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                    {
+                        Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                              I2connection_Events.EVT_CODE_PD_HI_CRITICAL_TEMP_OVER,
+                                              Convert.ToUInt32(i));
+                        HDD_temp.PD_OC_time[i] = DateTime.Now;
+                    }
+                }
+                else if (!((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
+                          (HDD_temp.cur_temp[i] > HDD_temp.HDD_OW_threshold[i]))
+                {
+                    /*
+                    ** VessApp CPU temperature is not stable, it may jump for over 3
+                    ** degrees between 2 times temperature monitoring and soon be lower
+                    ** than threshold, we try to check 2 times for make sure the
+                    ** temperature is 'really' over warning temperaure threshold
+                    */
+
+                    /*
+                    ** check if the previous temperature is also over warning temperaure
+                    ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
+                    */
+
+                    if (HDD_temp.prev_temp[i] > HDD_temp.HDD_OW_threshold[i] &&
+                       !((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    {
+                        HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
+                        HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        Console.WriteLine("2nd time over warn-threshold.\n");
+                        if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                              I2connection_Events.EVT_CODE_PD_TEMP_OVER,
+                                              Convert.ToUInt32(i));
+                        }
+                    }
+                    else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    {
+
+                        Console.WriteLine("1nd time over warn-threshold.\n");
+                    }
+                    else
+                    {
+                        Console.WriteLine("cool down but don't change fan");
+                    }
+                }
+                else if (((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          (HDD_temp.cur_temp[i] < HDD_temp.HDD_OC_threshold[i]) &&
+                          (HDD_temp.cur_temp[i] > (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])) &&
+                          (HDD_temp.prev_temp[i] < HDD_temp.HDD_OC_threshold[i]) &&
+                          (HDD_temp.prev_temp[i] > (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])))
+                {
+                    /* Over critical -> over warning */
+                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_UC;
+                    Console.WriteLine("Joel : Over critical -> over warning.\n");
+                }
+                else if ((((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) ||
+                         (HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         (HDD_temp.cur_temp[i] <= (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])) &&
+                         (HDD_temp.prev_temp[i] <= (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])))
+                {
+                    /* Over warning/critical to normal */
+                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_OW |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_UC |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
+                    Console.WriteLine("Joel : Over warning -> normal.\n");
+                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                          I2connection_Events.EVT_CODE_PD_TEMP_RETURNED_TO_NORMAL,
+                                          Convert.ToUInt32(i));
+                }
+                else
+                {
+                    /* Over warning/critical to normal */
+                }
+                if ((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                {
+                    // blink flag on;
+                    HDD_OC_detect = true;
+
+                    if ((DateTime.Now - HDD_temp.PD_OC_time[i]).Ticks > (60 * 10000000))
+                    {
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
+                                         I2connection_Events.EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
+                                         Convert.ToUInt32(i));
+                    }
+                }
+                else
+                {
+                    HDD_temp.PD_OC_time[i] = DateTime.Now;
+                }
+            }
+
+            HDD_OC_blink = HDD_OC_detect;
+        }
+        #endregion
+
+        #region acrroding PS status to change fan flag
+        private void ProcessPDTemperatureSts()
+        {
+            // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
+            for (int i = 0; i < I2connection.NumOfHDSlots; i++)
+            {
+                if (((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                    ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                {
+                    //FAN MAX
+                    Console.WriteLine("FAN MAX.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
+                    Fan_control_flag |= FAN_Max;
+                    // AUTO_FAN(0xF| FAN_MASK_SYS);
+                    // break;
+                }
+                else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         ((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                        !((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
+                        !((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                {
+                    //fan increase
+                    Console.WriteLine("FAN increase.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
+                    Fan_control_flag |= FAN_Increase;
+                    //AUTO_FAN(0x1| FAN_MASK_SYS);
+                    // break;
+                }
+                /* else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) |
+                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW))
+                 {
+                     //fan decrease   /Enclsoure_Constants.ENC_TEMP_STAT_UW
+                     Console.WriteLine("FAN decrease.\n");
+                 }*/
+                else if (((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UW) == Enclsoure_Constants.ENC_TEMP_STAT_UW))
+                {
+                    //if Fan to standard mode then Cur_stat ~ UW;
+                    Console.WriteLine("FAN decrease.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
+                    Fan_control_flag |= FAN_Decrease;
+                    //AUTO_FAN(0x2| FAN_MASK_SYS);
+                    if (FAN_LEVEL == FAN_Default_LEVEL)
+                    {
+                        HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    }
+                    //break;
+                }
+            }
+        }
+        #endregion
+
+        #endregion
+
+ #region PSU thermal
+      
+        #region Check PSU temp status
+        public void CheckPSUTEMPstatus()
+        {
+            for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
+            {
+
+                //Console.WriteLine("outdata.PSU_temperatures[{0}] = {1} ", i, outdata.PSU_temperatures[i]);
+                // Console.WriteLine(" NOW  Temp_OW_threshold[{0}] : 0x{1}", i, PSU_tempObj.Temp_OW_threshold[i]);
+                // Console.WriteLine(" NOW  Temp_OC_threshold[{0}] : 0x{1}", i, PSU_tempObj.Temp_OC_threshold[i]);
+                /*with out previous status*/
+                if (PSU_tempObj.prev_temp[i] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
+                {
+                    if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OC_threshold[i])
+                    {
+                        PSU_tempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                                              Convert.ToUInt32(i));
+                    }
+                    else if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OW_threshold[i])
+                    {
+                        PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+                                              Convert.ToUInt32(i));
+                    }
+                    else
+                    {
+                        PSU_tempObj.cur_stat[i] = 0;
+                    }
+                    continue;
+                }
+                if (!((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                     (PSU_tempObj.prev_temp[i] >= PSU_tempObj.Temp_OC_threshold[i]) &&
+                     (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OC_threshold[i]))
+                {
+                    /* Normal/Over warning  -> Over critical */
+                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
+                    PSU_tempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
+                    if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                    {
+                        Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                             I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                                             Convert.ToUInt32(i));
+                        PSU_tempObj.Controller_OC_time[i] = DateTime.Now; ////update time base;
+                    }
+                }
+                else if (!((PSU_tempObj.prev_stat[i] & 0x03) == 0x03) &&
+                          (outdata.PSU_temperatures[i] > PSU_tempObj.Temp_OW_threshold[i]))
+                {
+                    /*
+                    ** VessApp CPU temperature is not stable, it may jump for over 3
+                    ** degrees between 2 times temperature monitoring and soon be lower
+                    ** than threshold, we try to check 2 times for make sure the
+                    ** temperature is 'really' over warning temperaure threshold
+                    */
+
+                    /*
+                    ** check if the previous temperature is also over warning temperaure
+                    ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
+                    */
+
+                    if (PSU_tempObj.prev_temp[i] > PSU_tempObj.Temp_OW_threshold[i] &&
+                       !((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    {
+                        PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
+                        PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        Console.WriteLine("2nd time over warn-threshold.\n");
+                        if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                                I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+                                                Convert.ToUInt32(i));
+                        }
+
+                    }
+                    else if (!((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    {
+
+                        Console.WriteLine("1nd time over warn-threshold.\n");
+                    }
+                    else
+                    {
+                        Console.WriteLine("cool down but don't change fan");
+                    }
+                }
+                else if (((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          (outdata.PSU_temperatures[i] < PSU_tempObj.Temp_OC_threshold[i]) &&
+                          (outdata.PSU_temperatures[i] > (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])) &&
+                          (PSU_tempObj.prev_temp[i] < PSU_tempObj.Temp_OC_threshold[i]) &&
+                          (PSU_tempObj.prev_temp[i] > (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])))
+                {
+                    /* Over critical -> over warning */
+                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_UC;
+                    Console.WriteLine("Joel : Over critical -> over warning.\n");
+                }
+                else if ((((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) ||
+                         (PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         (outdata.PSU_temperatures[i] <= (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])) &&
+                         (PSU_tempObj.prev_temp[i] <= (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])))
+                {
+                    /* Over warning/critical to normal */
+                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_OW |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_UC |
+                                             Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
+                    Console.WriteLine("Joel : Over warning -> normal.\n");
+                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                          I2connection_Events.EVT_CODE_TEMP_RETURNED_TO_NORMAL,
+                                          Convert.ToUInt32(i));
+                }
+                else
+                {
+                    /* Over warning/critical to normal */
+
+
+                }
+
+                //check temp[i] is over critical 1min?
+                if ((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                {
+                    if ((DateTime.Now - PSU_tempObj.Controller_OC_time[i]).Ticks > (60 * 10000000))
+                    {
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                                         I2connection_Events.EVT_CODE_TEMP_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
+                                         Convert.ToUInt32(i));
+                    }
+                }
+                else
+                {
+                    PSU_tempObj.Controller_OC_time[i] = DateTime.Now;
+                }
+            }
+        }
+        #endregion
+
+        #region acrroding PSU status to change fan
+        private void ProcessPSUTemperatureSts()
+        {
+            // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
+            uint fanID = FAN_MASK_CPU | FAN_MASK_SYS;
+            for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
+            {
+                //if (i == 0)
+                //fanID = FAN_MASK_SYS;
+
+                if (((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                    ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                {
+                    //FAN MAX
+                    Console.WriteLine("FAN MAX.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX. PSUTemp[" + i + "]=" + outdata.PSU_temperatures[i]);
+                    //AUTO_FAN(0xF| fanID);
+                    Fan_control_flag |= FAN_Max;
+                }
+                else if (!((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         ((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                        !((PSU_tempObj.prev_stat[i] & 0x03) == 0x03) &&
+                        !((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                {
+                    //fan increase
+                    Console.WriteLine("FAN increase.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.PSUTemp[" + i + "]=" + outdata.PSU_temperatures[i]);
+                    Fan_control_flag |= FAN_Increase;
+                    //AUTO_FAN(0x1| fanID);
+                }
+                /* else if (!((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          !((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
+                           ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) |
+                           ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW))
+                 {
+                     //fan decrease   /Enclsoure_Constants.ENC_TEMP_STAT_UW
+                     Console.WriteLine("FAN decrease.\n");
+                 }*/
+                else if (((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UW) == Enclsoure_Constants.ENC_TEMP_STAT_UW))
+                {
+                    //if Fan to standard mode then Cur_stat ~ UW;
+                    Console.WriteLine("FAN decrease.\n");
+                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.PSUTemp[" + i + "]=" + outdata.PSU_temperatures[i]);
+                    //AUTO_FAN(0x2| fanID);
+                    Fan_control_flag |= FAN_Decrease;
+                    if (FAN_LEVEL == FAN_Default_LEVEL + 1)
+                    {
+                        PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    }
+                }
+            }
+        }
+        #endregion
+ #endregion
 
         private void UpdatePrevTempObjStat()
         {
@@ -612,60 +1060,13 @@ namespace Enclsoure
                 HDD_temp.prev_temp[i] = HDD_temp.cur_temp[i];
                 HDD_temp.prev_stat[i] = HDD_temp.cur_stat[i];
             }
-
-        }
-
-        private void ProcessTemperatureSts()
-        {
-           // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
-            uint fanID = FAN_MASK_CPU | FAN_MASK_SYS;
-            for (int i = 0; i < outdata.all_temperatures.Length; i++)
+            for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
             {
-                //if (i == 0)
-                    //fanID = FAN_MASK_SYS;
-
-                if (((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                    ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
-                {
-                    //FAN MAX
-                    Console.WriteLine("FAN MAX.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX. Temp["+i+"]="+ outdata.all_temperatures[i]);
-                    //AUTO_FAN(0xF| fanID);
-                    Fan_control_flag |= FAN_Max;
-                }
-                else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                         ((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                        !((TempObj.prev_stat[i] & 0x03) == 0x03)&&
-                        !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
-                {
-                    //fan increase
-                    Console.WriteLine("FAN increase.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.Temp[" + i + "]=" + outdata.all_temperatures[i]);
-                    Fan_control_flag |= FAN_Increase;
-                    //AUTO_FAN(0x1| fanID);
-                }
-               /* else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                         !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                          ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) |
-                          ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW))
-                {
-                    //fan decrease   /Enclsoure_Constants.ENC_TEMP_STAT_UW
-                    Console.WriteLine("FAN decrease.\n");
-                }*/
-                else if (((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UW) == Enclsoure_Constants.ENC_TEMP_STAT_UW))
-                {
-                    //if Fan to standard mode then Cur_stat ~ UW;
-                    Console.WriteLine("FAN decrease.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.Temp[" + i + "]=" + outdata.all_temperatures[i]);
-                    //AUTO_FAN(0x2| fanID);
-                    Fan_control_flag |= FAN_Decrease;
-                    if (FAN_LEVEL == FAN_Default_LEVEL+1)
-                    {
-                        TempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    }
-                }
+                PSU_tempObj.prev_temp[i] = outdata.PSU_temperatures[i];
+                PSU_tempObj.prev_stat[i] = PSU_tempObj.cur_stat[i];
             }
         }
+
         private void AUTO_FAN(uint status)
         {
             uint FanID= status & (FAN_MASK_SYS | FAN_MASK_CPU);
@@ -1037,187 +1438,7 @@ namespace Enclsoure
             }
         }
 
-        public void CheckPDTEMPstatus()
-        {
-            bool HDD_OC_detect = false;
-            for (int i = 0; i < I2connection.NumOfHDSlots; i++)
-            {
-                //Console.WriteLine("outdata.all_temperatures[{0}] = {1} ", i, HDD_temp.cur_temp[i]);
-                if (HDD_temp.cur_temp[i] == 0xff)//HDD temp invalid
-                    continue;
-                /*with out previous status*/
-                if (HDD_temp.prev_temp[i] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
-                {
-                    if (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OC_threshold[i])
-                    {
-                        HDD_temp.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
-                    }
-                    else if (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OW_threshold[i])
-                    {
-                        HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
-                    }
-                    else
-                    {
-                        HDD_temp.cur_stat[i] = 0;
-                    }
-                    continue;
-                }
-                if (!((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                     (HDD_temp.prev_temp[i] >= HDD_temp.HDD_OC_threshold[i]) &&
-                     (HDD_temp.cur_temp[i] >= HDD_temp.HDD_OC_threshold[i]))
-                {
-                    /* Normal/Over warning  -> Over critical */
-                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
-                    HDD_temp.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
-                    if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
-                    {
-                        Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
-                                              I2connection_Events.EVT_CODE_PD_HI_CRITICAL_TEMP_OVER,
-                                              Convert.ToUInt32(i));
-                        HDD_temp.PD_OC_time[i] = DateTime.Now;
-                    }
-                }
-                else if (!((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
-                          (HDD_temp.cur_temp[i] > HDD_temp.HDD_OW_threshold[i]))
-                {
-                    /*
-                    ** VessApp CPU temperature is not stable, it may jump for over 3
-                    ** degrees between 2 times temperature monitoring and soon be lower
-                    ** than threshold, we try to check 2 times for make sure the
-                    ** temperature is 'really' over warning temperaure threshold
-                    */
 
-                    /*
-                    ** check if the previous temperature is also over warning temperaure
-                    ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
-                    */
-
-                    if (HDD_temp.prev_temp[i] > HDD_temp.HDD_OW_threshold[i] &&
-                       !((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
-                    {
-                        HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
-                        HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
-                        Console.WriteLine("2nd time over warn-threshold.\n");
-                        if ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
-                        {
-                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
-                                              I2connection_Events.EVT_CODE_PD_TEMP_OVER,
-                                              Convert.ToUInt32(i));
-                        }
-                    }
-                    else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
-                    {
-
-                        Console.WriteLine("1nd time over warn-threshold.\n");
-                    }
-                    else
-                    {
-                        Console.WriteLine("cool down but don't change fan");
-                    }
-                }
-                else if (((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                          (HDD_temp.cur_temp[i] < HDD_temp.HDD_OC_threshold[i]) &&
-                          (HDD_temp.cur_temp[i] > (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])) &&
-                          (HDD_temp.prev_temp[i] < HDD_temp.HDD_OC_threshold[i]) &&
-                          (HDD_temp.prev_temp[i] > (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])))
-                {
-                    /* Over critical -> over warning */
-                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_UC;
-                    Console.WriteLine("Joel : Over critical -> over warning.\n");
-                }
-                else if ((((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) ||
-                         (HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                         (HDD_temp.cur_temp[i] <= (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])) &&
-                         (HDD_temp.prev_temp[i] <= (HDD_temp.HDD_OW_threshold[i] - HDD_temp.hys_temp[i])))
-                {
-                    /* Over warning/critical to normal */
-                    HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC |
-                                             Enclsoure_Constants.ENC_TEMP_STAT_OW |
-                                             Enclsoure_Constants.ENC_TEMP_STAT_UC |
-                                             Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    HDD_temp.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
-                    Console.WriteLine("Joel : Over warning -> normal.\n");
-                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
-                                          I2connection_Events.EVT_CODE_PD_TEMP_RETURNED_TO_NORMAL,
-                                          Convert.ToUInt32(i));
-                }
-                else
-                {
-                    /* Over warning/critical to normal */
-                }
-                if((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC)== Enclsoure_Constants.ENC_TEMP_STAT_OC)
-                {
-                    // blink flag on;
-                    HDD_OC_detect = true;
-
-                    if ((DateTime.Now - HDD_temp.PD_OC_time[i]).Ticks > (60 * 10000000))
-                    {
-                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PHYSICAL_DISK,
-                                         I2connection_Events.EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
-                                         Convert.ToUInt32(i));
-                    }
-                }
-                else
-                {
-                    HDD_temp.PD_OC_time[i] = DateTime.Now;
-                }
-            }
-
-            HDD_OC_blink = HDD_OC_detect;
-        }
-
-        private void ProcessPDTemperatureSts()
-        {
-           // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
-            for (int i = 0; i < I2connection.NumOfHDSlots; i++)
-            {
-                if (((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                    ((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
-                {
-                    //FAN MAX
-                    Console.WriteLine("FAN MAX.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN MAX.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
-                    Fan_control_flag |= FAN_Max;
-                   // AUTO_FAN(0xF| FAN_MASK_SYS);
-                   // break;
-                }
-                else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                         ((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                        !((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
-                        !((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
-                {
-                    //fan increase
-                    Console.WriteLine("FAN increase.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN increase.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
-                    Fan_control_flag |= FAN_Increase;
-                    //AUTO_FAN(0x1| FAN_MASK_SYS);
-                   // break;
-                }
-                /* else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                          !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) |
-                           ((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW))
-                 {
-                     //fan decrease   /Enclsoure_Constants.ENC_TEMP_STAT_UW
-                     Console.WriteLine("FAN decrease.\n");
-                 }*/
-                else if (((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UW) == Enclsoure_Constants.ENC_TEMP_STAT_UW))
-                {
-                    //if Fan to standard mode then Cur_stat ~ UW;
-                    Console.WriteLine("FAN decrease.\n");
-                    Prom_Enclosure_Serives.Log_File.FileLog("FAN decrease.HDD Temp[" + i + "]=" + HDD_temp.cur_temp[i]);
-                    Fan_control_flag |= FAN_Decrease;
-                    //AUTO_FAN(0x2| FAN_MASK_SYS);
-                    if (FAN_LEVEL == FAN_Default_LEVEL)
-                    {
-                        HDD_temp.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    }
-                    //break;
-                }
-            }
-        }
     }
 }
 

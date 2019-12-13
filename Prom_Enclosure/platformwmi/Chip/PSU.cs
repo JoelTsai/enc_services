@@ -26,7 +26,7 @@ namespace Chip.Contrl
             uint addr = NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR;
             NCT7802_MID = new NCT7802();
             NCT7802_MID.Chip_init(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR);
-#if false
+#if false // not necessary form FW code 
             data = NCT7802_Constants.NCT7802Y_BANK_DATA_0;
             offset = NCT7802_Constants.NCT7802Y_BANK_DATA_0;
             if (I2C_write_value(addr, offset, ref data) == -1)
@@ -112,7 +112,6 @@ namespace Chip.Contrl
                 //goto exit_error;
             }
 #endif
-
             PSULEDinit();
             PSUFanSpeedInit();
         }
@@ -140,13 +139,12 @@ namespace Chip.Contrl
                 Console.WriteLine("PCH200 PSU I2C write fail.\n");
             }
         }
-
         private void PSUFanSpeedInit()
         {
             uint data = 0, addr = 0, offset = 0, fanNum;
 
 
-            for (fanNum = 0; fanNum < ENC_PSU_DEVICE_CNT; fanNum++)
+            for (fanNum = 0; fanNum < ENC_PSU_DEVICE_CNT-1; fanNum++)
             {
                     switch (fanNum)
                     {
@@ -170,10 +168,6 @@ namespace Chip.Contrl
                     }
 
             }
-        }
-        public void Set_Fan(uint fanNum, uint level)
-        {
-
         }
 
         public void Get_Temperature(ref uint?[] Temperature)//ref uint?[] Temperature)
@@ -453,6 +447,17 @@ namespace Chip.Contrl
 
             return;
         }
+
+        public void PSU_thermal()
+        {
+
+        }
+
+
+
+
+
+
 
         public int I2C_write_value(uint addr, uint reg, ref uint data)
         {
