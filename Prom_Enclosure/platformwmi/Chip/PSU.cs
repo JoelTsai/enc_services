@@ -16,10 +16,32 @@ using System.Threading.Tasks;
 
 namespace Chip.Contrl
 {
+    internal struct PSU_status
+    {
+        public bool[] OPERATIONAL;
+        public bool[] PRESENT;
+       // public bool[] TEMP_OC;
+        public PSU_status(uint var)
+        {
+            OPERATIONAL = new bool[var];
+            PRESENT = new bool[var];
+           // TEMP_OC = new bool[var];
+
+            for (int i = 0; i < var; i++)
+            {
+                OPERATIONAL[i] = false;
+                PRESENT[i] = false;
+              //  TEMP_OC[i] = false;
+            }
+        } 
+
+    };
+
     public class PSU
     {
         private byte ENC_PSU_DEVICE_CNT = 0x03;
         public NCT7802 NCT7802_MID;
+        internal PSU_status Status = new PSU_status(PSU_Constants.PSU_NUM);
         public PSU()
         {
             uint data = 0, offset = 0;
@@ -172,12 +194,14 @@ namespace Chip.Contrl
 
         public void Get_Temperature(ref uint?[] Temperature)//ref uint?[] Temperature)
         {
-            uint status = 0, data = 0, addr = 0, offset = 0, bit = 0;
+            uint  data = 0, addr = 0, offset = 0, bit = 0;
+            bool status;
             for (uint tempNum = 0; tempNum < Temperature.Length; tempNum++)
             {
+                status = false;
                 PSUPresentStatus(tempNum, ref status);
 
-                if (status == 0)
+                if (status == false)
                 {
                     Temperature[tempNum] = 0;
                     return;
@@ -212,9 +236,9 @@ namespace Chip.Contrl
             return;
         }
 
-        public void PSUPresentStatus(uint psuNum, ref uint status)
+        public void PSUPresentStatus(uint psuNum, ref bool status)
         {
-            uint data = 0, addr = 0, offset = 0, bit=0;
+            uint data = 0, addr = 0, offset = 0, presentbit = 0, operationbit = 0;
 
             addr = NCT7802_Constants.NCT7802Y_POWER_MID_PLANE_ADDR_4;
             offset = NCT7802_Constants.PCA955A_READ_PORT_0;
@@ -222,11 +246,13 @@ namespace Chip.Contrl
             switch (psuNum)
             {
                 case PCH_Constants.PCH200_I2C_DEV_PSU_0:
-                    bit = NCT7802_Constants.NCT7802Y_GPIO5_MASK;
+                    presentbit = NCT7802_Constants.NCT7802Y_GPIO5_MASK;
+                    operationbit = NCT7802_Constants.NCT7802Y_GPIO2_MASK;
                     break;
 
                 case PCH_Constants.PCH200_I2C_DEV_PSU_1:
-                    bit = NCT7802_Constants.NCT7802Y_GPIO4_MASK;
+                    presentbit = NCT7802_Constants.NCT7802Y_GPIO4_MASK;
+                    operationbit = NCT7802_Constants.NCT7802Y_GPIO1_MASK;
                     break;
 
                 default:
@@ -239,18 +265,75 @@ namespace Chip.Contrl
                 Console.WriteLine("PCH200 PSU I2C read fail.\n");
                // return;
             }
-
-            if ((data & bit) == 0)
+            if (presentbit != 0)
             {
-                status = 1; /* present */
-                //gEncPSUPresent[psuNum] = TRUE;
+                if ((data & presentbit) == 0)
+                {
+
+                    if ((data & operationbit) == 0)
+                    {
+
+                        if (Status.PRESENT[psuNum] == false)
+                        {
+
+                          I2connection.SetEvent(I2connection_Events.EVT_CLASS_PSU,
+                          I2connection_Events.EVT_CODE_PSU_INSTALLED_AND_TURNED_OFF,
+                          psuNum);
+                        }
+                        else if (Status.PRESENT[psuNum] == true && Status.OPERATIONAL[psuNum]==true)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PSU,
+                            I2connection_Events.EVT_CODE_PSU_OPERATIONAL_AND_TURNED_OFF,
+                            psuNum);
+                        }
+
+                        Status.PRESENT[psuNum] = true;
+                        Status.OPERATIONAL[psuNum] = false;
+
+                    }
+                    else
+                    {
+                        if (Status.PRESENT[psuNum] == false)
+                        {
+
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PSU,
+                            I2connection_Events.EVT_CODE_PSU_INSTALLED_AND_TURNED_ON,
+                            psuNum);
+                        }
+                        else if (Status.PRESENT[psuNum] == true && Status.OPERATIONAL[psuNum]==false)
+                        {
+                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_PSU,
+                            I2connection_Events.EVT_CODE_PSU_OPERATIONAL_AND_TURNED_ON,
+                            psuNum);
+                        }
+
+
+                        Status.PRESENT[psuNum] = true;
+                        Status.OPERATIONAL[psuNum] = true;
+                    }//gEncPSUPresent[psuNum] = TRUE;
+                }
+                else
+                {
+                    if (Status.PRESENT[psuNum] == true)
+                    {
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_PSU,
+                            I2connection_Events.EVT_CODE_PSU_REMOVED,
+                            psuNum);
+
+                        Status.PRESENT[psuNum] = false;
+                        Status.OPERATIONAL[psuNum] = false;
+                    }//status = false; /* not present */
+                    //gEncPSUPresent[psuNum] = FALSE;
+                }
             }
             else
             {
-                status = 0; /* not present */
-                //gEncPSUPresent[psuNum] = FALSE;
+                Status.PRESENT[psuNum] = false;
+                Status.OPERATIONAL[psuNum] = false;
             }
 
+            status = Status.PRESENT[psuNum];
+            return;
         }
         public void GetPSUFanSpeed(ref uint?[,] Fan)
         {

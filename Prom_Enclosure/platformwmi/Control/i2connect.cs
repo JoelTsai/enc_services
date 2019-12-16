@@ -32,6 +32,7 @@ namespace i2api
         internal const uint EVT_CLASS_COOLING_DEVICE = 0x0005;
         internal const uint EVT_CLASS_TEMPERATURE    = 0x001e;
         internal const uint EVT_CLASS_PHYSICAL_DISK = 0x000d;
+        internal const uint EVT_CLASS_PSU = 0x000e;
 
         /* EVT_CLASS_COOLING_DEVICE             0x05 */
         internal const uint EVT_CODE_COOLING_DEVICE_STARTED = 0x00;
@@ -61,9 +62,22 @@ namespace i2api
         internal const uint EVT_CODE_PD_TEMP_OVER = 0x39;
         internal const uint EVT_CODE_PD_TEMP_RETURNED_TO_NORMAL = 0x3A;
         internal const uint EVT_CODE_PD_HI_CRITICAL_TEMP_OVER = 0x3B;
-        internal const uint EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU = 0x3D;  
+        internal const uint EVT_CODE_PD_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU = 0x3D;
         /* EVT_CLASS_PHYSICAL_DISK              0x0d */
 
+
+        /* EVT_CLASS_PSU                        0x0e */
+        internal const uint EVT_CODE_PSU_NOT_PRESENT = 0x00; 
+        internal const uint EVT_CODE_PSU_OFF = 0x01;   
+        internal const uint EVT_CODE_PSU_ON = 0x02; 
+        internal const uint EVT_CODE_PSU_INSTALLED_AND_TURNED_ON = 0x03;//module change
+        internal const uint EVT_CODE_PSU_INSTALLED_AND_TURNED_OFF = 0x04;//module change
+        internal const uint EVT_CODE_PSU_OPERATIONAL_AND_TURNED_ON = 0x05;//cable change
+        internal const uint EVT_CODE_PSU_OPERATIONAL_AND_TURNED_OFF = 0x06;
+        internal const uint EVT_CODE_PSU_MALFUNCTIONING_AND_TURNED_ON = 0x07;
+        internal const uint EVT_CODE_PSU_MALFUNCTIONING_AND_TURNED_OFF = 0x08;//cable change
+        internal const uint EVT_CODE_PSU_REMOVED = 0x09;
+        /* EVT_CLASS_PSU                        0x0e */
     }
 
     public class I2connection

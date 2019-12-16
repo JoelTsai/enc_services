@@ -7,6 +7,7 @@
 **                    All Rights  Reserved.                                  **
 **---------------------------------------------------------------------------*/
 
+
 using System;
 using System.Threading;
 using System.Globalization;
@@ -92,8 +93,6 @@ namespace Enclsoure
                 hys_temp[i] = 4;
             }
         }
-
-
     };
 
     internal struct HDD_TEMPOBJ
@@ -289,7 +288,6 @@ namespace Enclsoure
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
             PSU_tempObj = new TEMPOBJ(Convert.ToInt32(PSU_Constants.PSU_NUM));
-
             Console.WriteLine("!!NumOfHDSlots = 0x{0:x} ", I2connection.NumOfHDSlots);
             PD_OC_blink_thread = new Thread(PD_OC_Blink);
         }
@@ -301,6 +299,7 @@ namespace Enclsoure
             Enclosure_GET_fan();
             Enclosure_GET_volate();
             Enclosure_GET_temperatures();
+
             if (Model_ID != 0xffff)
             {
                 Enclosure_GET_led();
@@ -412,7 +411,6 @@ namespace Enclsoure
 
             PSU.Get_Temperature(ref PSU_temperatures);
             Array.Copy(PSU_temperatures, outdata.PSU_temperatures, PSU_temperatures.Length);
-
             /* for(int i=0;i<PSU_temperatures.Length;i++)
              {
 
@@ -464,8 +462,12 @@ namespace Enclsoure
             Fan_control_flag = FAN_Invalid;
             UpdatePrevTempObjStat();
         }
-#region Controller thermal    
-        
+
+        ///////////////////////////////
+        ///controller thermal handle///
+        ///////////////////////////////
+        #region Controller thermal    
+
         #region Check Controller temp status 
         public void CheckTEMPstatus()
         {
@@ -658,9 +660,12 @@ namespace Enclsoure
             }
         }
         #endregion
-#endregion
+        #endregion
 
-#region PD thermal  
+        ///////////////////////////////
+        ///    HDD thermal handle   ///
+        ///////////////////////////////
+        #region PD thermal  
 
         #region Check PD temp status 
         public void CheckPDTEMPstatus()
@@ -850,8 +855,11 @@ namespace Enclsoure
 
         #endregion
 
- #region PSU thermal
-      
+        ///////////////////////////////
+        ///    PSU thermal handle   ///
+        ///////////////////////////////
+        #region PSU thermal
+
         #region Check PSU temp status
         public void CheckPSUTEMPstatus()
         {
@@ -867,9 +875,11 @@ namespace Enclsoure
                     if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OC_threshold[i])
                     {
                         PSU_tempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
-                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                              I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
-                                              Convert.ToUInt32(i));
+#if eventOK
+#error                  I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+#error                        I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+#error                       Convert.ToUInt32(i));
+#endif
                     }
                     else if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OW_threshold[i])
                     {
@@ -894,9 +904,11 @@ namespace Enclsoure
                     if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
                     {
                         Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                             I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
-                                             Convert.ToUInt32(i));
+#if eventOK
+#error                       I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+#error                                           I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+#error                       Convert.ToUInt32(i));
+#endif
                         PSU_tempObj.Controller_OC_time[i] = DateTime.Now; ////update time base;
                     }
                 }
@@ -923,9 +935,11 @@ namespace Enclsoure
                         Console.WriteLine("2nd time over warn-threshold.\n");
                         if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
                         {
-                            I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-                                                I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
-                                                Convert.ToUInt32(i));
+#if eventOK
+#error                           I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+#error                            I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+#error                           Convert.ToUInt32(i));
+#endif
                         }
 
                     }
@@ -989,9 +1003,9 @@ namespace Enclsoure
                 }
             }
         }
-        #endregion
+#endregion
 
-        #region acrroding PSU status to change fan
+#region acrroding PSU status to change fan
         private void ProcessPSUTemperatureSts()
         {
             // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
@@ -1043,8 +1057,8 @@ namespace Enclsoure
                 }
             }
         }
-        #endregion
- #endregion
+#endregion
+#endregion
 
         private void UpdatePrevTempObjStat()
         {
@@ -1426,6 +1440,17 @@ namespace Enclsoure
                     Fan_color = TCA6416_Constants.ENC_LED_RED;
                 }
                 FAN_LED_trigger = false;
+            }
+            for (uint i = 0; i < PSU_Constants.PSU_NUM; i++)
+            {
+                if (PSU.Status.PRESENT[i] == false||
+                    PSU.Status.OPERATIONAL[i]==false||
+                    ((PSU_tempObj.cur_stat[i]& Enclsoure_Constants.ENC_TEMP_STAT_OC)== Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                {
+                    PSU.SetPSUGlobeErr(i,PSU_Constants.ENC_LED_RED);
+                }
+                else
+                    PSU.SetPSUGlobeErr(i, PSU_Constants.ENC_LED_GREEN);
             }
         }
 
