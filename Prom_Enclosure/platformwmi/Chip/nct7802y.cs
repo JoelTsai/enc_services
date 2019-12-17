@@ -69,6 +69,14 @@ namespace Chip.Contrl
 
                 }
 
+                data = NCT7802_Constants.NCT7802Y_CONFIG_DATA_START;
+                offset = NCT7802_Constants.NCT7802Y_CONFIG_START_REG;
+                if (Nct7802y_write_value(addr, offset, ref data) == -1)
+                {
+                    Console.WriteLine("Nct7802y I2C write fail.\n");
+                    
+                }
+
             if (Enclsoure.Enclsoure_class.Model_ID == Enclsoure.Enclsoure_class.Model_VA8100)
             {
                 FAN_Level = NCT7802_Constants.NIDEC_FAN_Level;

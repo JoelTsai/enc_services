@@ -33,6 +33,8 @@ namespace Enclsoure
         internal const uint ENC_TEMP_STAT_OW = 0x0002; /* over warning */
         internal const uint ENC_TEMP_STAT_UC = 0x0004;/* under critical */
         internal const uint ENC_TEMP_STAT_UW = 0x0008;/* under warning */
+        internal const uint ENC_TEMP_STAT_MASK_OCW = ENC_TEMP_STAT_OC & ENC_TEMP_STAT_OW;/* over critical and warning */
+
 
         internal const uint VOL_STS_NORMAL = 0x0;
         internal const uint VOL_STS_CRIT_OVER = 0x1;
@@ -373,6 +375,7 @@ namespace Enclsoure
                     outdata.all_fans[i] = (SMB_fans[i - NTC_array_length, 1] << 24) | SMB_fans[i - NTC_array_length, 0];
                 }
             }
+#if PSU_OK
             PSU.GetPSUFanSpeed(ref PSU_fans);
             for (int i = 0; i < PSU_array_length; i++)
             {
@@ -380,7 +383,7 @@ namespace Enclsoure
                 // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
                 outdata.PSU_fans[i] = (PSU_fans[i, 1] << 24) | PSU_fans[i, 0];
             }
-
+#endif
             //sensorData.Add("Fan", outdata.all_fans);
 
 
@@ -408,9 +411,10 @@ namespace Enclsoure
 
             NCT.Get_Temperature(ref NCT_temperatures);
             Array.Copy(NCT_temperatures, 0, outdata.all_temperatures, CPU_temperatures.Length, NCT_temperatures.Length);
-
+#if PSU_ok
             PSU.Get_Temperature(ref PSU_temperatures);
             Array.Copy(PSU_temperatures, outdata.PSU_temperatures, PSU_temperatures.Length);
+#endif
             /* for(int i=0;i<PSU_temperatures.Length;i++)
              {
 
@@ -466,9 +470,9 @@ namespace Enclsoure
         ///////////////////////////////
         ///controller thermal handle///
         ///////////////////////////////
-        #region Controller thermal    
+#region Controller thermal    
 
-        #region Check Controller temp status 
+#region Check Controller temp status 
         public void CheckTEMPstatus()
         {
             for(int i=0; i< outdata.all_temperatures.Length;i++)
@@ -516,7 +520,7 @@ namespace Enclsoure
                         TempObj.Controller_OC_time[i] = DateTime.Now; ////update time base;
                     }
                 }
-           else if (!((TempObj.prev_stat[i] & 0x03) == 0x03)&&
+           else if (!((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) == Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) &&
                      ( outdata.all_temperatures[i] > TempObj.Temp_OW_threshold[i]))
                 {
                     /*
@@ -605,9 +609,9 @@ namespace Enclsoure
                 }
             }
         }
-        #endregion
+#endregion
 
-        #region acrroding Controller status to change fan
+#region acrroding Controller status to change fan
         private void ProcessTemperatureSts()
         {
             // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
@@ -628,7 +632,7 @@ namespace Enclsoure
                 }
                 else if (!((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
                          ((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                        !((TempObj.prev_stat[i] & 0x03) == 0x03) &&
+                        !((TempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) == Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) &&
                         !((TempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                 {
                     //fan increase
@@ -659,15 +663,15 @@ namespace Enclsoure
                 }
             }
         }
-        #endregion
-        #endregion
+#endregion
+#endregion
 
         ///////////////////////////////
         ///    HDD thermal handle   ///
         ///////////////////////////////
-        #region PD thermal  
+#region PD thermal  
 
-        #region Check PD temp status 
+#region Check PD temp status 
         public void CheckPDTEMPstatus()
         {
             bool HDD_OC_detect = false;
@@ -709,7 +713,7 @@ namespace Enclsoure
                         HDD_temp.PD_OC_time[i] = DateTime.Now;
                     }
                 }
-                else if (!((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
+                else if (!((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) == Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) &&
                           (HDD_temp.cur_temp[i] > HDD_temp.HDD_OW_threshold[i]))
                 {
                     /*
@@ -798,9 +802,9 @@ namespace Enclsoure
 
             HDD_OC_blink = HDD_OC_detect;
         }
-        #endregion
+#endregion
 
-        #region acrroding PS status to change fan flag
+#region acrroding PS status to change fan flag
         private void ProcessPDTemperatureSts()
         {
             // Console.WriteLine("FAN_LEVEL=0x{0:x}", FAN_LEVEL);
@@ -818,7 +822,7 @@ namespace Enclsoure
                 }
                 else if (!((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
                          ((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                        !((HDD_temp.prev_stat[i] & 0x03) == 0x03) &&
+                        !((HDD_temp.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) == Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) &&
                         !((HDD_temp.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                 {
                     //fan increase
@@ -851,24 +855,57 @@ namespace Enclsoure
                 }
             }
         }
-        #endregion
+#endregion
 
-        #endregion
+#endregion
 
         ///////////////////////////////
         ///    PSU thermal handle   ///
         ///////////////////////////////
-        #region PSU thermal
+#region PSU thermal
 
-        #region Check PSU temp status
+#region Check PSU temp status
         public void CheckPSUTEMPstatus()
         {
-            for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
+            for (uint Indx = 0; Indx < outdata.PSU_temperatures.Length; Indx++)
             {
 
-                //Console.WriteLine("outdata.PSU_temperatures[{0}] = {1} ", i, outdata.PSU_temperatures[i]);
-                // Console.WriteLine(" NOW  Temp_OW_threshold[{0}] : 0x{1}", i, PSU_tempObj.Temp_OW_threshold[i]);
-                // Console.WriteLine(" NOW  Temp_OC_threshold[{0}] : 0x{1}", i, PSU_tempObj.Temp_OC_threshold[i]);
+                if(outdata.PSU_temperatures[Indx] >= PSU_tempObj.Temp_OC_threshold[Indx])
+                {
+                   /* PSUOCCount++;
+
+                    if (PSUOCCount >= gEncPSUEquipPSUNum)
+                    {
+                        shutdownSensor = Indx;
+                        shutdown = PRO_TRUE;
+                    }*/
+                }
+                // N+1 PSU temperature over warning 
+                else if (outdata.PSU_temperatures[Indx] > PSU_tempObj.Temp_OW_threshold[Indx])
+                {
+                    if (PSU_tempObj.prev_temp[Indx] <= PSU_tempObj.Temp_OW_threshold[Indx])
+                    {
+                       // PSU_CTRL_FAN = TRUE;
+                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_DEFAULT_FAN_SPEED);
+                        //encSimulatorSetPSUFanSpeed((Indx - gEncTempSensorCnt), ENC_PSU_FULL_FAN_SPEED);
+                    }
+                }
+                // N+1 PSU temperature return to warning 
+                else if (outdata.PSU_temperatures[Indx] <= (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx]))
+                {
+                    if (PSU_tempObj.prev_temp[Indx] > (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx]))
+                    {
+                       // PSU_CTRL_FAN = FALSE;
+                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_FULL_FAN_SPEED);
+                       // encSimulatorSetPSUFanSpeed((Indx - gEncTempSensorCnt), ENC_PSU_DEFAULT_FAN_SPEED);
+                    }
+                }
+
+
+
+
+
+#if false
                 /*with out previous status*/
                 if (PSU_tempObj.prev_temp[i] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
                 {
@@ -1001,6 +1038,8 @@ namespace Enclsoure
                 {
                     PSU_tempObj.Controller_OC_time[i] = DateTime.Now;
                 }
+
+#endif
             }
         }
 #endregion
@@ -1026,7 +1065,7 @@ namespace Enclsoure
                 }
                 else if (!((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
                          ((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) &&
-                        !((PSU_tempObj.prev_stat[i] & 0x03) == 0x03) &&
+                        !((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) == Enclsoure_Constants.ENC_TEMP_STAT_MASK_OCW) &&
                         !((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                 {
                     //fan increase
@@ -1441,6 +1480,7 @@ namespace Enclsoure
                 }
                 FAN_LED_trigger = false;
             }
+#if PSU_ok
             for (uint i = 0; i < PSU_Constants.PSU_NUM; i++)
             {
                 if (PSU.Status.PRESENT[i] == false||
@@ -1452,6 +1492,7 @@ namespace Enclsoure
                 else
                     PSU.SetPSUGlobeErr(i, PSU_Constants.ENC_LED_GREEN);
             }
+#endif
         }
 
         public void VerifyPDtemp()

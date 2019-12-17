@@ -419,7 +419,7 @@ extern "C"
 
 		if (hScsi == INVALID_HANDLE_VALUE)
 		{
-			printf("BBBBB!\n");
+			//printf("BBBBB!\n");
 			return FALSE;
 		}
 
