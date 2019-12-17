@@ -273,6 +273,10 @@ namespace Enclsoure
             TCA_leds = new uint?[2];
             
             NCT_fans = new uint?[NCT677X.SIO_FAN_NUM,2];
+            for (int i = 0; i < NCT677X.SIO_FAN_NUM; i++)
+                NCT_fans[i, 1] = Enclsoure_Constants.FAN_OPERATIONAL;//init the FAN status
+
+
             if (Model_ID != Model_VA8020 && Model_ID != 0xFFFF) 
             {
                 SMB_fans = new uint?[2,2];
