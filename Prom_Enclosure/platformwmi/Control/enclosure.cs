@@ -6,8 +6,8 @@
 **         (C)Copyright Promise Technology Inc., 2019                        **
 **                    All Rights  Reserved.                                  **
 **---------------------------------------------------------------------------*/
-
-
+#define PSU_new
+//#define DEBUG
 using System;
 using System.Threading;
 using System.Globalization;
@@ -150,6 +150,7 @@ namespace Enclsoure
         public NCT677X NCT;
         public NCT7802 NCT7802_BP;
         public PSU PSU;
+
         // public CPU CPU;
         public TCA6416 tca6416;
         All_senserdata outdata;
@@ -170,7 +171,7 @@ namespace Enclsoure
 
         public  static ushort Model_ID = 0;
 
-
+        private uint Contoller_sensor = 0;
 
         private uint?[] NCT_voltages = new uint?[0];
         private uint?[] NCT_temperatures = new uint?[0];
@@ -283,9 +284,13 @@ namespace Enclsoure
             outdata.all_voltages = new uint?[NCT_voltages.Length];
             outdata.all_temperatures = new uint?[NCT_temperatures.Length + CPU_temperatures.Length];
             outdata.all_leds = new uint?[TCA_leds.Length];
-            outdata.PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
-            outdata.PSU_fans = new uint?[PSU_Constants.PSU_NUM];
 
+            Contoller_sensor =Convert.ToUInt32(NCT_temperatures.Length + CPU_temperatures.Length);
+            if (Model_ID == Model_VA8200D)
+            {
+                outdata.PSU_temperatures = new uint?[PSU_Constants.PSU_NUM];
+                outdata.PSU_fans = new uint?[PSU_Constants.PSU_NUM];
+            }
 
             TempObj = new TEMPOBJ(outdata.all_temperatures.Length);
             HDD_temp = new HDD_TEMPOBJ(I2connection.NumOfHDSlots);
@@ -339,8 +344,11 @@ namespace Enclsoure
             sensorData.Add("Temperature", outdata.all_temperatures);
             sensorData.Add("Fan", outdata.all_fans);
             sensorData.Add("Voltage", outdata.all_voltages);
-            sensorData.Add("PSU_Temperature", outdata.PSU_temperatures);
-            sensorData.Add("PSU_Fan", outdata.PSU_fans);
+            if (Model_ID == Model_VA8200D)
+            {
+                sensorData.Add("PSU_Temperature", outdata.PSU_temperatures);
+                sensorData.Add("PSU_Fan", outdata.PSU_fans);
+            }
             //sensorData.Add("Led", outdata.all_leds);
             //
 
@@ -375,15 +383,18 @@ namespace Enclsoure
                     outdata.all_fans[i] = (SMB_fans[i - NTC_array_length, 1] << 24) | SMB_fans[i - NTC_array_length, 0];
                 }
             }
-#if PSU_OK
-            PSU.GetPSUFanSpeed(ref PSU_fans);
-            for (int i = 0; i < PSU_array_length; i++)
+
+            if (Model_ID == Model_VA8200D)
             {
-                // Console.WriteLine(" NCT_fans[{1}, 1] = 0x{0:x} ", NCT_fans[i, 1], i);
-                // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
-                outdata.PSU_fans[i] = (PSU_fans[i, 1] << 24) | PSU_fans[i, 0];
+                PSU.GetPSUFanSpeed(ref PSU_fans);
+                for (int i = 0; i < PSU_array_length; i++)
+                {
+                    // Console.WriteLine(" NCT_fans[{1}, 1] = 0x{0:x} ", NCT_fans[i, 1], i);
+                    // Console.WriteLine(" NCT_fans[{1}, 0] = 0x{0:x} ", NCT_fans[i, 0], i);
+                    outdata.PSU_fans[i] = (PSU_fans[i, 1] << 24) | PSU_fans[i, 0];
+                }
             }
-#endif
+
             //sensorData.Add("Fan", outdata.all_fans);
 
 
@@ -411,10 +422,13 @@ namespace Enclsoure
 
             NCT.Get_Temperature(ref NCT_temperatures);
             Array.Copy(NCT_temperatures, 0, outdata.all_temperatures, CPU_temperatures.Length, NCT_temperatures.Length);
-#if PSU_ok
-            PSU.Get_Temperature(ref PSU_temperatures);
-            Array.Copy(PSU_temperatures, outdata.PSU_temperatures, PSU_temperatures.Length);
-#endif
+
+            if (Model_ID == Model_VA8200D)
+            {
+                PSU.Get_Temperature(ref PSU_temperatures);
+                Array.Copy(PSU_temperatures, outdata.PSU_temperatures, PSU_temperatures.Length);
+            }
+
             /* for(int i=0;i<PSU_temperatures.Length;i++)
              {
 
@@ -442,9 +456,11 @@ namespace Enclsoure
             CheckPDTEMPstatus();
             ProcessPDTemperatureSts();
 
-            //PSU
-            CheckPSUTEMPstatus();
-
+            if (Model_ID == Model_VA8200D)
+            {
+                //PSU
+                CheckPSUTEMPstatus();
+            }
 
             FAN_CHANGE_time_diff = DateTime.Now - FAN_CHANGE_Time_offset;
             if ((Fan_control_flag & FAN_Max) == FAN_Max)
@@ -869,24 +885,27 @@ namespace Enclsoure
         {
             for (uint Indx = 0; Indx < outdata.PSU_temperatures.Length; Indx++)
             {
-
+#if PSU_old
                 if(outdata.PSU_temperatures[Indx] >= PSU_tempObj.Temp_OC_threshold[Indx])
                 {
-                   /* PSUOCCount++;
+                    PSU_tempObj.cur_stat[Indx] = Enclsoure_Constants.ENC_TEMP_STAT_OC;
+                    /* PSUOCCount++;
 
-                    if (PSUOCCount >= gEncPSUEquipPSUNum)
-                    {
-                        shutdownSensor = Indx;
-                        shutdown = PRO_TRUE;
-                    }*/
+                     if (PSUOCCount >= gEncPSUEquipPSUNum)
+                     {
+                         shutdownSensor = Indx;
+                         shutdown = PRO_TRUE;
+                     }*/
                 }
                 // N+1 PSU temperature over warning 
                 else if (outdata.PSU_temperatures[Indx] > PSU_tempObj.Temp_OW_threshold[Indx])
                 {
                     if (PSU_tempObj.prev_temp[Indx] <= PSU_tempObj.Temp_OW_threshold[Indx])
                     {
-                       // PSU_CTRL_FAN = TRUE;
-                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_DEFAULT_FAN_SPEED);
+                        // PSU_CTRL_FAN = TRUE;
+                        PSU_tempObj.cur_stat[Indx] = Enclsoure_Constants.ENC_TEMP_STAT_OW;
+
+                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_FULL_FAN_SPEED);
                         //encSimulatorSetPSUFanSpeed((Indx - gEncTempSensorCnt), ENC_PSU_FULL_FAN_SPEED);
                     }
                 }
@@ -895,62 +914,63 @@ namespace Enclsoure
                 {
                     if (PSU_tempObj.prev_temp[Indx] > (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx]))
                     {
-                       // PSU_CTRL_FAN = FALSE;
-                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_FULL_FAN_SPEED);
+                        // PSU_CTRL_FAN = FALSE;
+                        PSU_tempObj.cur_stat[Indx] = Enclsoure_Constants.ENC_TEMP_STAT_NORMAL;
+                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_DEFAULT_FAN_SPEED);
                        // encSimulatorSetPSUFanSpeed((Indx - gEncTempSensorCnt), ENC_PSU_DEFAULT_FAN_SPEED);
                     }
                 }
-
-
-
-
-
-#if false
-                /*with out previous status*/
-                if (PSU_tempObj.prev_temp[i] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
-                {
-                    if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OC_threshold[i])
-                    {
-                        PSU_tempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
-#if eventOK
-#error                  I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-#error                        I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
-#error                       Convert.ToUInt32(i));
 #endif
-                    }
-                    else if (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OW_threshold[i])
+
+
+
+
+#if PSU_new
+                /*with out previous status*/
+                if (PSU_tempObj.prev_temp[Indx] == Enclsoure_Constants.ENC_TEMP_INVALID_VALUE)
+                {
+                    if (outdata.PSU_temperatures[Indx] >= PSU_tempObj.Temp_OC_threshold[Indx])
                     {
-                        PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        PSU_tempObj.cur_stat[Indx] |= (Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_OW);
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                        I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                        Convert.ToUInt32(Indx + Contoller_sensor));
+
+                    }
+                    else if (outdata.PSU_temperatures[Indx] >= PSU_tempObj.Temp_OW_threshold[Indx])
+                    {
+                        PSU_tempObj.cur_stat[Indx] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
                                               I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
-                                              Convert.ToUInt32(i));
+                                              Convert.ToUInt32(Indx));
                     }
                     else
                     {
-                        PSU_tempObj.cur_stat[i] = 0;
+                        PSU_tempObj.cur_stat[Indx] = 0;
                     }
                     continue;
                 }
-                if (!((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                     (PSU_tempObj.prev_temp[i] >= PSU_tempObj.Temp_OC_threshold[i]) &&
-                     (outdata.PSU_temperatures[i] >= PSU_tempObj.Temp_OC_threshold[i]))
+                if (!((PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                     (PSU_tempObj.prev_temp[Indx] >= PSU_tempObj.Temp_OC_threshold[Indx]) &&
+                     (outdata.PSU_temperatures[Indx] >= PSU_tempObj.Temp_OC_threshold[Indx]))
                 {
                     /* Normal/Over warning  -> Over critical */
-                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
-                    PSU_tempObj.cur_stat[i] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
-                    if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                    PSU_tempObj.cur_stat[Indx] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear UC and UW */
+                    PSU_tempObj.cur_stat[Indx] |= (Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_OC);
+                    if ((PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OC) != Enclsoure_Constants.ENC_TEMP_STAT_OC)
                     {
                         Console.WriteLine("Joel : Normal/Over warning -> Over critical.\n");
-#if eventOK
-#error                       I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-#error                                           I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
-#error                       Convert.ToUInt32(i));
-#endif
-                        PSU_tempObj.Controller_OC_time[i] = DateTime.Now; ////update time base;
+                        I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                        I2connection_Events.EVT_CODE_TEMP_ABOVE_CRITICAL,
+                        Convert.ToUInt32(Indx + Contoller_sensor));
+
+                        PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_FULL_FAN_SPEED);
+
+                        PSU_tempObj.Controller_OC_time[Indx] = DateTime.Now; ////update time base;
                     }
                 }
-                else if (!((PSU_tempObj.prev_stat[i] & 0x03) == 0x03) &&
-                          (outdata.PSU_temperatures[i] > PSU_tempObj.Temp_OW_threshold[i]))
+                else if (!((PSU_tempObj.prev_stat[Indx] & 0x03) == 0x03) &&
+                          (outdata.PSU_temperatures[Indx] > PSU_tempObj.Temp_OW_threshold[Indx]))
                 {
                     /*
                     ** VessApp CPU temperature is not stable, it may jump for over 3
@@ -964,23 +984,23 @@ namespace Enclsoure
                     ** threshold, the value should not be ENC_TEMP_INVALID_VALUE
                     */
 
-                    if (PSU_tempObj.prev_temp[i] > PSU_tempObj.Temp_OW_threshold[i] &&
-                       !((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    if (PSU_tempObj.prev_temp[Indx] > PSU_tempObj.Temp_OW_threshold[Indx] &&
+                       !((PSU_tempObj.cur_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                     {
-                        PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
-                        PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
+                        PSU_tempObj.cur_stat[Indx] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);/* clear OC, UC and UW */
+                        PSU_tempObj.cur_stat[Indx] |= Enclsoure_Constants.ENC_TEMP_STAT_OW;
                         Console.WriteLine("2nd time over warn-threshold.\n");
-                        if ((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
+                        if ((PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OW) != Enclsoure_Constants.ENC_TEMP_STAT_OW)
                         {
-#if eventOK
-#error                           I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
-#error                            I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
-#error                           Convert.ToUInt32(i));
-#endif
+                           I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                           I2connection_Events.EVT_CODE_TEMP_ABOVE_WARNING,
+                           Convert.ToUInt32(Indx + Contoller_sensor));
+
+                            PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_FULL_FAN_SPEED);
                         }
 
                     }
-                    else if (!((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
+                    else if (!((PSU_tempObj.cur_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_UC) == Enclsoure_Constants.ENC_TEMP_STAT_UC))
                     {
 
                         Console.WriteLine("1nd time over warn-threshold.\n");
@@ -990,32 +1010,34 @@ namespace Enclsoure
                         Console.WriteLine("cool down but don't change fan");
                     }
                 }
-                else if (((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                          (outdata.PSU_temperatures[i] < PSU_tempObj.Temp_OC_threshold[i]) &&
-                          (outdata.PSU_temperatures[i] > (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])) &&
-                          (PSU_tempObj.prev_temp[i] < PSU_tempObj.Temp_OC_threshold[i]) &&
-                          (PSU_tempObj.prev_temp[i] > (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])))
+                else if (((PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                          (outdata.PSU_temperatures[Indx] < PSU_tempObj.Temp_OC_threshold[Indx]) &&
+                          (outdata.PSU_temperatures[Indx] > (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx])) &&
+                          (PSU_tempObj.prev_temp[Indx] < PSU_tempObj.Temp_OC_threshold[Indx]) &&
+                          (PSU_tempObj.prev_temp[Indx] > (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx])))
                 {
                     /* Over critical -> over warning */
-                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_UC;
+                    PSU_tempObj.cur_stat[Indx] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC | Enclsoure_Constants.ENC_TEMP_STAT_UC | Enclsoure_Constants.ENC_TEMP_STAT_UW);
+                    PSU_tempObj.cur_stat[Indx] |= Enclsoure_Constants.ENC_TEMP_STAT_OW | Enclsoure_Constants.ENC_TEMP_STAT_UC;
                     Console.WriteLine("Joel : Over critical -> over warning.\n");
                 }
-                else if ((((PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) ||
-                         (PSU_tempObj.prev_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
-                         (outdata.PSU_temperatures[i] <= (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])) &&
-                         (PSU_tempObj.prev_temp[i] <= (PSU_tempObj.Temp_OW_threshold[i] - PSU_tempObj.hys_temp[i])))
+                else if ((((PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OW) == Enclsoure_Constants.ENC_TEMP_STAT_OW) ||
+                         (PSU_tempObj.prev_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC) &&
+                         (outdata.PSU_temperatures[Indx] <= (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx])) &&
+                         (PSU_tempObj.prev_temp[Indx] <= (PSU_tempObj.Temp_OW_threshold[Indx] - PSU_tempObj.hys_temp[Indx])))
                 {
                     /* Over warning/critical to normal */
-                    PSU_tempObj.cur_stat[i] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC |
+                    PSU_tempObj.cur_stat[Indx] &= ~(Enclsoure_Constants.ENC_TEMP_STAT_OC |
                                              Enclsoure_Constants.ENC_TEMP_STAT_OW |
                                              Enclsoure_Constants.ENC_TEMP_STAT_UC |
                                              Enclsoure_Constants.ENC_TEMP_STAT_UW);
-                    PSU_tempObj.cur_stat[i] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
+                    PSU_tempObj.cur_stat[Indx] |= Enclsoure_Constants.ENC_TEMP_STAT_UW;
                     Console.WriteLine("Joel : Over warning -> normal.\n");
                     I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
                                           I2connection_Events.EVT_CODE_TEMP_RETURNED_TO_NORMAL,
-                                          Convert.ToUInt32(i));
+                                          Convert.ToUInt32(Indx+ Contoller_sensor));
+
+                    PSU.PSUSetFanSpeed(Indx, PSU_Constants.ENC_PSU_DEFAULT_FAN_SPEED);
                 }
                 else
                 {
@@ -1023,20 +1045,35 @@ namespace Enclsoure
 
 
                 }
-
-                //check temp[i] is over critical 1min?
-                if ((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC)
+#if DEBUG
+                int a = 0;
+                Console.Clear();
+                Console.WriteLine("1 for ture debug");
+                if(Convert.ToUInt16(Console.ReadLine())==1)
                 {
-                    if ((DateTime.Now - PSU_tempObj.Controller_OC_time[i]).Ticks > (60 * 10000000))
+                    Console.WriteLine("input num");
+                    a = Convert.ToUInt16(Console.ReadLine());
+                 //   I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                //      I2connection_Events.EVT_CODE_TEMP_RETURNED_TO_NORMAL,
+                 //     Convert.ToUInt32(a + Contoller_sensor));
+                    I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
+                        I2connection_Events.EVT_CODE_TEMP_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
+                        Convert.ToUInt32(a+ Contoller_sensor));
+                }
+#endif
+                //check temp[i] is over critical 1min?
+                if ((PSU_tempObj.cur_stat[Indx] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC)
+                {
+                    if ((DateTime.Now - PSU_tempObj.Controller_OC_time[Indx]).Ticks > (60 * 10000000))
                     {
                         I2connection.SetEvent(I2connection_Events.EVT_CLASS_TEMPERATURE,
                                          I2connection_Events.EVT_CODE_TEMP_ABOVE_PROTECTION_THRESHOLD_SHUTDOWN_PSU,
-                                         Convert.ToUInt32(i));
+                                         Convert.ToUInt32(Indx+ Contoller_sensor));
                     }
                 }
                 else
                 {
-                    PSU_tempObj.Controller_OC_time[i] = DateTime.Now;
+                    PSU_tempObj.Controller_OC_time[Indx] = DateTime.Now;
                 }
 
 #endif
@@ -1113,10 +1150,13 @@ namespace Enclsoure
                 HDD_temp.prev_temp[i] = HDD_temp.cur_temp[i];
                 HDD_temp.prev_stat[i] = HDD_temp.cur_stat[i];
             }
-            for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
+            if (Model_ID == Model_VA8200D)
             {
-                PSU_tempObj.prev_temp[i] = outdata.PSU_temperatures[i];
-                PSU_tempObj.prev_stat[i] = PSU_tempObj.cur_stat[i];
+                for (int i = 0; i < outdata.PSU_temperatures.Length; i++)
+                {
+                    PSU_tempObj.prev_temp[i] = outdata.PSU_temperatures[i];
+                    PSU_tempObj.prev_stat[i] = PSU_tempObj.cur_stat[i];
+                }
             }
         }
 
@@ -1480,19 +1520,21 @@ namespace Enclsoure
                 }
                 FAN_LED_trigger = false;
             }
-#if PSU_ok
-            for (uint i = 0; i < PSU_Constants.PSU_NUM; i++)
+            if (Model_ID == Model_VA8200D)
             {
-                if (PSU.Status.PRESENT[i] == false||
-                    PSU.Status.OPERATIONAL[i]==false||
-                    ((PSU_tempObj.cur_stat[i]& Enclsoure_Constants.ENC_TEMP_STAT_OC)== Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                for (uint i = 0; i < PSU_Constants.PSU_NUM; i++)
                 {
-                    PSU.SetPSUGlobeErr(i,PSU_Constants.ENC_LED_RED);
+                    if (PSU.Status.PRESENT[i] == false ||
+                        PSU.Status.OPERATIONAL[i] == false ||
+                        ((PSU_tempObj.cur_stat[i] & Enclsoure_Constants.ENC_TEMP_STAT_OC) == Enclsoure_Constants.ENC_TEMP_STAT_OC))
+                    {
+                        PSU.SetPSUGlobeErr(i, PSU_Constants.ENC_LED_RED);
+                    }
+                    else
+                        PSU.SetPSUGlobeErr(i, PSU_Constants.ENC_LED_GREEN);
                 }
-                else
-                    PSU.SetPSUGlobeErr(i, PSU_Constants.ENC_LED_GREEN);
             }
-#endif
+
         }
 
         public void VerifyPDtemp()

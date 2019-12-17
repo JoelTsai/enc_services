@@ -85,7 +85,7 @@ namespace Chip.Contrl
                         if (ReadSMB(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, 0x00, 1, ref data_temp) == 0)
                         {
                             I2connection.NumOfHDSlots = 8;
-                            Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200");
+                            Prom_Enclosure_Serives.Log_File.FileLog("Model Confirm is A8200D");
                             Model_check_result = true;
                         }
                             
