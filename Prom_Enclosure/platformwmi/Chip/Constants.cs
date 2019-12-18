@@ -236,8 +236,11 @@ namespace Chip.Contrl
         internal const uint SIO_R1_VCORE = 0x0;
         internal const uint SIO_R2_VCORE = 0x1;
         internal const uint SIO_R1_3VCC = 0x22;
-        internal const uint SIO_R2_3VCCE = 0x22;
-
+        internal const uint SIO_R2_3VCC = 0x22;
+        internal const uint SIO_R1_12V = 56;
+        internal const uint SIO_R2_12V = 10;
+        internal const uint SIO_R1_5V = 20;
+        internal const uint SIO_R2_5V = 10;
         /* Need to check
          * internal const uint NCT5567_ENV_VOLT_CPUCORE_REG = 0x480;
         internal const uint Nct6776_ENV_VOLT_12V_REG = 0x021;

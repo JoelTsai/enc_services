@@ -394,18 +394,17 @@ namespace Chip.Contrl
                             switch (voltageTypes[i])
                             {
                                 case VoltageType.VOLTAGE_TYPE_1V:
-                                    Temp = data * 8;
-                                    break;
+                                Temp = data * 8 * ((NCT5567_Constants.SIO_R1_VCORE + NCT5567_Constants.SIO_R2_VCORE) * 2) / NCT5567_Constants.SIO_R2_VCORE;
+                                break;
                                 case VoltageType.VOLTAGE_TYPE_5V:
-                                    Temp = data * 8 * (20 + 10) / 10;
-                                    break;
+                                Temp = data * 8 * (NCT5567_Constants.SIO_R1_5V + NCT5567_Constants.SIO_R2_5V) / NCT5567_Constants.SIO_R2_5V;
+                                break;
                                 case VoltageType.VOLTAGE_TYPE_12V:
-                                    Temp = data * 8 * (56 + 10) / 10;
-                                    break;
+                                Temp = data * 8 * (NCT5567_Constants.SIO_R1_12V + NCT5567_Constants.SIO_R2_12V) / NCT5567_Constants.SIO_R2_12V;
+                                break;
                                 case VoltageType.VOLTAGE_TYPE_3_3V:
-                                    Temp = data * 8 * (34 + 34) / 34;
-                                Temp = data * 8 * (NCT5567_Constants.SIO_R1_3VCC + NCT5567_Constants.SIO_R2_3VCCE) / NCT5567_Constants.SIO_R2_3VCCE;
-                                    break;
+                                Temp = data * 8 * (NCT5567_Constants.SIO_R1_3VCC + NCT5567_Constants.SIO_R2_3VCC) / NCT5567_Constants.SIO_R2_3VCC;
+                                break;
                             }
                         voltages[i] = Convert.ToUInt32(((Temp / 1000) << 4) + ((Temp / 100) % 10));
                         break;
