@@ -134,6 +134,16 @@ namespace Chip.Contrl
                 //goto exit_error;
             }
 #endif
+
+            data = 0x2A;
+            I2C_write_value(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_GPIO_MODE_SELECT_REG,ref data);
+
+            data = 0x02;
+            I2C_write_value(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_TEMP_DETECT_RATE,ref data);
+
+            data = 0x3F;
+            I2C_write_value(NCT7802_Constants.NCT7802Y_BP_MID_PLANE_HW_MONITOR_ADDR, NCT7802_Constants.NCT7802Y_TEMP_FILTER_RATE,ref data);
+
             PSULEDinit();
             PSUFanSpeedInit();
         }
@@ -267,10 +277,10 @@ namespace Chip.Contrl
             }
             if (presentbit != 0)
             {
-                if ((data & presentbit) == 0)
+                if ((data & presentbit) == 0)//PSU in machine
                 {
 
-                    if ((data & operationbit) == 0)
+                    if ((data & operationbit) == 0)//PSU w/o  powercable
                     {
 
                         if (Status.PRESENT[psuNum] == false)
@@ -291,7 +301,7 @@ namespace Chip.Contrl
                         Status.OPERATIONAL[psuNum] = false;
 
                     }
-                    else
+                    else//PSU with powercable
                     {
                         if (Status.PRESENT[psuNum] == false)
                         {
